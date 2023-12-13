@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -65,7 +66,8 @@ func main() {
 		if update.Message != nil {
 			if update.Message.IsCommand() {
 				ctx := injectMessage(context.Background(), update.Message)
-				_, err := cmdr.Call(ctx, update.Message.Command(), update.Message.CommandArguments())
+				args := strings.Fields(update.Message.CommandArguments())
+				_, err := cmdr.Call(ctx, update.Message.Command(), args)
 				if err != nil {
 					msg := tgbotapi.NewMessage(update.Message.Chat.ID, err.Error())
 					msg.ReplyToMessageID = update.Message.MessageID

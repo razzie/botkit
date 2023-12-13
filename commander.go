@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
+
 type Command func(context.Context, string) ([]any, error)
 
 type Commander struct {
@@ -68,27 +70,43 @@ func convertInputs(ctx context.Context, fnType reflect.Type, args []string) ([]r
 	if numIn == 0 {
 		return nil, nil
 	}
-	inputs := make([]reflect.Value, numIn)
-	skipped := 0
+	inputs := make([]reflect.Value, 0, numIn)
+	var varArgs []string
 
-	if fnType.In(0).Implements(reflect.TypeOf((*context.Context)(nil)).Elem()) {
-		inputs[0] = reflect.ValueOf(ctx)
-		skipped++
+	if fnType.In(0).Implements(contextType) {
+		inputs = append(inputs, reflect.ValueOf(ctx))
 	}
-	if numIn-skipped != len(args) {
-		return nil, fmt.Errorf("expected %d argument(s), got %d", numIn-skipped, len(args))
+	if fnType.IsVariadic() {
+		if numIn <= len(args)+len(inputs) {
+			varArgs = args[numIn-1-len(inputs):]
+			args = args[:numIn-1-len(inputs)]
+		} else {
+			return nil, fmt.Errorf("expected at least %d argument(s), got %d", numIn-1-len(inputs), len(args))
+		}
+	} else {
+		if numIn != len(args)+len(inputs) {
+			return nil, fmt.Errorf("expected %d argument(s), got %d", numIn-len(inputs), len(args))
+		}
 	}
 
-	for i, arg := range args {
-		paramType := fnType.In(i + skipped)
+	for _, arg := range args {
+		paramType := fnType.In(len(inputs))
 		val, convErr := convertToType(arg, paramType)
 		if convErr != nil {
-			return nil, fmt.Errorf("error converting argument %d: %s", i, convErr)
+			return nil, fmt.Errorf("error converting argument #%d %q: %s", len(inputs), arg, convErr)
 		}
-		inputs[i+skipped] = val
+		inputs = append(inputs, val)
 	}
-
-	// TODO: variadic support
+	if len(varArgs) > 0 {
+		paramType := fnType.In(numIn - 1).Elem()
+		for _, arg := range varArgs {
+			val, convErr := convertToType(arg, paramType)
+			if convErr != nil {
+				return nil, fmt.Errorf("error converting variable argument #%d %q: %s", len(inputs), arg, convErr)
+			}
+			inputs = append(inputs, val)
+		}
+	}
 
 	return inputs, nil
 }
@@ -99,7 +117,7 @@ func convertToType(value string, targetType reflect.Type) (reflect.Value, error)
 		return reflect.ValueOf(value), nil
 	default:
 		result := reflect.New(targetType)
-		_, err := fmt.Sscan(value, &result)
-		return reflect.ValueOf(result), err
+		_, err := fmt.Sscan(value, result.Interface())
+		return reflect.Indirect(result), err
 	}
 }

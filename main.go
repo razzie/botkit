@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -33,8 +34,19 @@ func main() {
 		}
 	}
 
+	add := func(ctx context.Context, nums ...int) {
+		sum := 0
+		for _, n := range nums {
+			sum += n
+		}
+		if _, err := bot.Send(tgbotapi.NewMessage(getMessage(ctx).Chat.ID, strconv.Itoa(sum))); err != nil {
+			panic(err)
+		}
+	}
+
 	cmdr := NewCommander()
 	cmdr.RegisterCommand("send", send)
+	cmdr.RegisterCommand("add", add)
 
 	numericKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/razzie/commander"
 )
 
 type ctxKey string
@@ -45,7 +46,7 @@ func main() {
 		}
 	}
 
-	cmdr := NewCommander()
+	cmdr := commander.NewCommander()
 	cmdr.RegisterCommand("send", send)
 	cmdr.RegisterCommand("add", add)
 

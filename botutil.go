@@ -7,18 +7,24 @@ import (
 
 func SendMessage(ctx context.Context, format string, args ...any) error {
 	bot := CtxGetBot(ctx)
-	msg := CtxGetMessage(ctx)
-	if bot == nil || msg == nil {
+	if bot == nil {
 		return ErrInvalidContext
 	}
-	return bot.SendMessage(msg.Chat.ID, fmt.Sprintf(format, args...), 0)
+	return bot.SendMessage(ctx, fmt.Sprintf(format, args...), false)
 }
 
 func SendReply(ctx context.Context, format string, args ...any) error {
 	bot := CtxGetBot(ctx)
-	msg := CtxGetMessage(ctx)
-	if bot == nil || msg == nil {
+	if bot == nil {
 		return ErrInvalidContext
 	}
-	return bot.SendMessage(msg.Chat.ID, fmt.Sprintf(format, args...), msg.MessageID)
+	return bot.SendMessage(ctx, fmt.Sprintf(format, args...), true)
+}
+
+func StartDialog(ctx context.Context, name string) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.StartDialog(ctx, name)
 }

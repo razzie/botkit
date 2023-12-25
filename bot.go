@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -88,8 +87,11 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 	dlg := &Dialog{
 		user: ctxMsg.From,
 		chat: ctxMsg.Chat,
+		data: dialogData{
+			Name: name,
+		},
 	}
-	if q := h(dlg); q != nil {
+	if q := h(ctx, dlg); q != nil {
 		bot.handleQuery(dlg, q)
 		bot.saveDialog(dlg)
 	}
@@ -99,6 +101,15 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 func (bot *Bot) Close() error {
 	bot.api.StopReceivingUpdates()
 	return nil
+}
+
+func (bot *Bot) send(c tgbotapi.Chattable) (int, bool) {
+	resp, err := bot.api.Send(c)
+	if err != nil {
+		bot.logger.Error("failed to send message", slog.Any("err", err))
+		return 0, false
+	}
+	return resp.MessageID, true
 }
 
 func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) error {
@@ -112,7 +123,10 @@ func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) erro
 func (bot *Bot) getDialog(user *tgbotapi.User, chat *tgbotapi.Chat) *Dialog {
 	dataJson, err := bot.cache.Get(fmt.Sprintf("dialog:%d:%d", user.ID, chat.ID))
 	if err != nil {
-		bot.logger.Error("dialog not found", slog.Any("err", err))
+		bot.logger.Error("dialog not found",
+			slog.Any("user", user.ID),
+			slog.Any("chat", chat.ID),
+			slog.Any("err", err))
 		return nil
 	}
 	dlg := &Dialog{
@@ -140,35 +154,67 @@ func (bot *Bot) saveDialog(dlg *Dialog) {
 	}
 }
 
-func (bot *Bot) handleDialog(user *tgbotapi.User, chat *tgbotapi.Chat, response string) bool {
+func (bot *Bot) deleteDialog(dlg *Dialog) {
+	err := bot.cache.Del(fmt.Sprintf("dialog:%d:%d", dlg.user.ID, dlg.chat.ID))
+	if err != nil {
+		bot.logger.Error("failed to delete dialog", slog.Any("err", err))
+	}
+}
+
+func (bot *Bot) handleDialog(user *tgbotapi.User, chat *tgbotapi.Chat, input any) bool {
 	dlg := bot.getDialog(user, chat)
 	if dlg == nil {
 		return false
 	}
+
 	h := bot.dialogs[dlg.data.Name]
 	if h == nil {
 		bot.logger.Error("dialog not handled", slog.String("name", dlg.data.Name))
-		return false
+		bot.deleteDialog(dlg)
+		return true
 	}
-	defer bot.saveDialog(dlg)
-	if q, ok := dlg.data.Queries[dlg.data.LastQuery]; ok {
-		switch q.Kind {
-		case SingleChoiceQuery:
-			choice, _ := strconv.Atoi(response)
-			dlg.data.ChoiceResponses[q.Name][choice] = true
-		case MultiChoiceQuery:
-			if response != "done" {
-				choice, _ := strconv.Atoi(response)
-				dlg.data.ChoiceResponses[q.Name][choice] = !dlg.data.ChoiceResponses[q.Name][choice]
 
-				// update buttons !!!
+	lastQuery := dlg.LastQuery()
+	if lastQuery == nil {
+		bot.logger.Error("last query missing", slog.String("name", dlg.data.Name))
+		bot.deleteDialog(dlg)
+		return true
+	}
 
+	ctx := context.Background()
+	ctx = ctxWithBot(ctx, bot)
+
+	switch input := input.(type) {
+	case *tgbotapi.CallbackQuery:
+		ctx = ctxWithMessage(ctx, input.Message)
+		if choice, isDone, ok := lastQuery.getDataFromCallback(input); ok {
+			if !isDone {
+				dlg.flipUserChoice(choice)
+				editMsg := tgbotapi.NewEditMessageText(
+					input.Message.Chat.ID,
+					input.Message.MessageID,
+					input.Message.Text,
+				)
+				editMsg.ReplyMarkup = lastQuery.getInlineKeybordMarkup(dlg)
+				bot.send(editMsg)
+				bot.saveDialog(dlg)
 				return true
 			}
+		} else {
+			return true
 		}
+	case *tgbotapi.Message:
+		ctx = ctxWithMessage(ctx, input)
+		dlg.setUserResponse(input.Text)
+	default:
+		bot.logger.Error("unhandled dialog input", slog.Any("input", input))
 	}
-	if q := h(dlg); q != nil {
+
+	if q := h(ctx, dlg); q != nil {
 		bot.handleQuery(dlg, q)
+		bot.saveDialog(dlg)
+	} else {
+		bot.deleteDialog(dlg)
 	}
 	return true
 }
@@ -182,14 +228,12 @@ func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
 	if err := bot.callCommand(cmd, ctx, args); err != nil {
 		msg := tgbotapi.NewMessage(msg.Chat.ID, err.Error())
 		//msg.ReplyToMessageID = msg.MessageID
-		if _, err := bot.api.Send(msg); err != nil {
-			bot.logger.Error("command returned error", slog.String("cmd", cmd), slog.Any("err", err))
-		}
+		bot.send(msg)
 	}
 }
 
 func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
-	if !bot.handleDialog(msg.From, msg.Chat, msg.Text) && bot.defaultMsgHandler != nil {
+	if !bot.handleDialog(msg.From, msg.Chat, msg) && bot.defaultMsgHandler != nil {
 		ctx := context.Background()
 		ctx = ctxWithBot(ctx, bot)
 		ctx = ctxWithMessage(ctx, msg)
@@ -201,7 +245,7 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 }
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
-	if bot.handleDialog(q.From, q.Message.Chat, q.Data) {
+	if bot.handleDialog(q.From, q.Message.Chat, q) {
 		callback := tgbotapi.NewCallback(q.ID, q.Data)
 		if _, err := bot.api.Request(callback); err != nil {
 			bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
@@ -210,17 +254,13 @@ func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 }
 
 func (bot *Bot) handleQuery(dlg *Dialog, q *Query) {
-	msg := q.toMessage()
-	if msg == nil {
-		bot.logger.Error("nothing sent")
-		return
-	}
-	resp, err := bot.api.Send(msg)
+	msg, err := q.toMessage(dlg)
 	if err != nil {
-		bot.logger.Error("failed to send message", slog.Any("err", err))
+		bot.logger.Error("failed to convert query to message", slog.Any("err", err))
 		return
 	}
-	q.MessageID = resp.MessageID
-	dlg.data.LastQuery = q.Name
-	dlg.data.Queries[q.Name] = *q
+	if msgID, ok := bot.send(msg); ok {
+		q.MessageID = msgID
+		dlg.setLastQuery(*q)
+	}
 }

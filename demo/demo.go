@@ -50,12 +50,9 @@ func cmdStartDialog(ctx context.Context) {
 }
 
 func dlg1Handler(ctx context.Context, dlg *botkit.Dialog) *botkit.Query {
-	q := dlg.LastQuery()
-	if q != nil {
-		choices := dlg.UserChoices()
+	if choices, ok := dlg.LastUserChoices(); ok {
 		botkit.SendMessage(ctx, "choices: %v", choices)
-	} else {
-		return botkit.NewMultiChoiseQuery("q1", "Pick your choices", "Apple", "Orange", "Banana")
+		return nil
 	}
-	return nil
+	return botkit.NewMultiChoiseQuery("q1", "Pick your choices", "Apple", "Orange", "Banana")
 }

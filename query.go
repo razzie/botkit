@@ -50,6 +50,24 @@ func NewMultiChoiseQuery(name, text string, choices ...string) *Query {
 	}
 }
 
+func (qk QueryKind) HasTextResponse() bool {
+	switch qk {
+	case TextInputQuery:
+		return true
+	default:
+		return false
+	}
+}
+
+func (qk QueryKind) HasChoiceResponse() bool {
+	switch qk {
+	case SingleChoiceQuery, MultiChoiceQuery:
+		return true
+	default:
+		return false
+	}
+}
+
 func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
 	switch q.Kind {
 	case TextInputQuery, SingleChoiceQuery, MultiChoiceQuery:

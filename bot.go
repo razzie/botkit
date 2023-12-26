@@ -227,6 +227,12 @@ func (bot *Bot) handleDialog(user *tgbotapi.User, chat *tgbotapi.Chat, input any
 		bot.logger.Error("unhandled dialog input", slog.Any("input", input))
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			bot.logger.Error("dialog panic", slog.String("name", dlg.data.Name), slog.Any("panic", r))
+			bot.deleteDialog(dlg)
+		}
+	}()
 	if q := h(ctx, dlg); q != nil {
 		if q.Kind == RetryQueryKind {
 			return true

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/razzie/commander"
@@ -96,6 +97,22 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 		bot.saveDialog(dlg)
 	}
 	return nil
+}
+
+func (bot *Bot) SetUserData(ctx context.Context, key, data string, ttl time.Duration) error {
+	ctxMsg := CtxGetMessage(ctx)
+	if ctxMsg == nil {
+		return ErrInvalidContext
+	}
+	return bot.cache.Set(fmt.Sprintf("userdata:%d:%d:%s", ctxMsg.From.ID, ctxMsg.Chat.ID, key), data, ttl)
+}
+
+func (bot *Bot) GetUserData(ctx context.Context, key string) (string, error) {
+	ctxMsg := CtxGetMessage(ctx)
+	if ctxMsg == nil {
+		return "", ErrInvalidContext
+	}
+	return bot.cache.Get(fmt.Sprintf("userdata:%d:%d:%s", ctxMsg.From.ID, ctxMsg.Chat.ID, key))
 }
 
 func (bot *Bot) Close() error {

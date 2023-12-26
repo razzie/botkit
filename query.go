@@ -9,10 +9,13 @@ import (
 )
 
 const (
-	TextInputQuery QueryKind = iota
-	SingleChoiceQuery
-	MultiChoiceQuery
+	TextInputQueryKind QueryKind = iota
+	SingleChoiceQueryKind
+	MultiChoiceQueryKind
+	RetryQueryKind
 )
+
+var RetryQuery = &Query{Kind: RetryQueryKind}
 
 type QueryKind int
 
@@ -27,7 +30,7 @@ type Query struct {
 func NewTextInputQuery(name, text string) *Query {
 	return &Query{
 		Name: name,
-		Kind: TextInputQuery,
+		Kind: TextInputQueryKind,
 		Text: text,
 	}
 }
@@ -35,7 +38,7 @@ func NewTextInputQuery(name, text string) *Query {
 func NewSingleChoiseQuery(name, text string, choices ...string) *Query {
 	return &Query{
 		Name:    name,
-		Kind:    SingleChoiceQuery,
+		Kind:    SingleChoiceQueryKind,
 		Text:    text,
 		Choices: choices,
 	}
@@ -44,7 +47,7 @@ func NewSingleChoiseQuery(name, text string, choices ...string) *Query {
 func NewMultiChoiseQuery(name, text string, choices ...string) *Query {
 	return &Query{
 		Name:    name,
-		Kind:    MultiChoiceQuery,
+		Kind:    MultiChoiceQueryKind,
 		Text:    text,
 		Choices: choices,
 	}
@@ -52,7 +55,7 @@ func NewMultiChoiseQuery(name, text string, choices ...string) *Query {
 
 func (qk QueryKind) HasTextResponse() bool {
 	switch qk {
-	case TextInputQuery:
+	case TextInputQueryKind:
 		return true
 	default:
 		return false
@@ -61,7 +64,7 @@ func (qk QueryKind) HasTextResponse() bool {
 
 func (qk QueryKind) HasChoiceResponse() bool {
 	switch qk {
-	case SingleChoiceQuery, MultiChoiceQuery:
+	case SingleChoiceQueryKind, MultiChoiceQueryKind:
 		return true
 	default:
 		return false
@@ -70,7 +73,7 @@ func (qk QueryKind) HasChoiceResponse() bool {
 
 func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
 	switch q.Kind {
-	case TextInputQuery, SingleChoiceQuery, MultiChoiceQuery:
+	case TextInputQueryKind, SingleChoiceQueryKind, MultiChoiceQueryKind:
 		msg := tgbotapi.NewMessage(dlg.chat.ID, q.Text)
 		if kbm := q.getInlineKeybordMarkup(dlg); kbm != nil {
 			msg.ReplyMarkup = *kbm
@@ -83,7 +86,7 @@ func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
 
 func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMarkup {
 	switch q.Kind {
-	case SingleChoiceQuery:
+	case SingleChoiceQueryKind:
 		buttons := make([]tgbotapi.InlineKeyboardButton, 0, len(q.Choices))
 		for i, choice := range q.Choices {
 			btnText := choice
@@ -95,7 +98,7 @@ func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMark
 		)
 		return &markup
 
-	case MultiChoiceQuery:
+	case MultiChoiceQueryKind:
 		dlgChoices := dlg.data.ChoiceResponses[q.Name]
 		buttons := make([]tgbotapi.InlineKeyboardButton, 0, len(q.Choices))
 		for i, choice := range q.Choices {

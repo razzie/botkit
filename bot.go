@@ -228,6 +228,9 @@ func (bot *Bot) handleDialog(user *tgbotapi.User, chat *tgbotapi.Chat, input any
 	}
 
 	if q := h(ctx, dlg); q != nil {
+		if q.Kind == RetryQueryKind {
+			return true
+		}
 		bot.handleQuery(dlg, q)
 		bot.saveDialog(dlg)
 	} else {

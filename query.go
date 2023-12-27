@@ -87,20 +87,18 @@ func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
 func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMarkup {
 	switch q.Kind {
 	case SingleChoiceQueryKind:
-		buttons := make([]tgbotapi.InlineKeyboardButton, 0, len(q.Choices))
+		buttons := make([][]tgbotapi.InlineKeyboardButton, 0, len(q.Choices))
 		for i, choice := range q.Choices {
 			btnText := choice
 			btnData := strconv.Itoa(i) + ":" + q.Name
-			buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(btnText, btnData))
+			buttons = append(buttons, []tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(btnText, btnData)})
 		}
-		markup := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(buttons...),
-		)
+		markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
 		return &markup
 
 	case MultiChoiceQueryKind:
 		dlgChoices := dlg.data.ChoiceResponses[q.Name]
-		buttons := make([]tgbotapi.InlineKeyboardButton, 0, len(q.Choices))
+		buttons := make([][]tgbotapi.InlineKeyboardButton, 0, len(q.Choices)+1)
 		for i, choice := range q.Choices {
 			btnText := choice
 			if dlgChoices[i] {
@@ -109,12 +107,10 @@ func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMark
 				btnText = "☐ " + btnText
 			}
 			btnData := strconv.Itoa(i) + ":" + q.Name
-			buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(btnText, btnData))
+			buttons = append(buttons, []tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(btnText, btnData)})
 		}
-		markup := tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(buttons...),
-			tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Done", "done:"+q.Name)),
-		)
+		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData("OK", "done:"+q.Name)})
+		markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
 		return &markup
 
 	default:

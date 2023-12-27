@@ -23,10 +23,23 @@ func main() {
 		token, _ = reader.ReadString('\n')
 	}
 
+	dlg := botkit.NewDialogBuilder().
+		AddMultiChoiceQuery("Pick your favorite", func(resp []int, prev []any) error {
+			if len(resp) < 1 {
+				return fmt.Errorf("pick at least one")
+			}
+			return nil
+		}, "Apple", "Orange", "Banana", "Grapes", "Melon").
+		AddTextInputQuery("Why?", nil).
+		SetFinalizer(func(ctx context.Context, responses []any) {
+			botkit.SendMessage(ctx, "responses: %v", responses)
+		}).
+		Build()
+
 	bot, err := botkit.NewBot(token,
 		botkit.WithCommand("hello", cmdHelloWorld),
 		botkit.WithCommand("startdlg", cmdStartDialog),
-		botkit.WithDialog("dlg1", dlg1Handler))
+		botkit.WithDialog("dlg", dlg))
 	if err != nil {
 		panic(err)
 	}
@@ -46,13 +59,5 @@ func cmdHelloWorld(ctx context.Context) {
 }
 
 func cmdStartDialog(ctx context.Context) {
-	botkit.StartDialog(ctx, "dlg1")
-}
-
-func dlg1Handler(ctx context.Context, dlg *botkit.Dialog) *botkit.Query {
-	if choices, ok := dlg.LastUserChoices(); ok {
-		botkit.SendMessage(ctx, "choices: %v", choices)
-		return nil
-	}
-	return botkit.NewMultiChoiseQuery("q1", "Pick your choices", "Apple", "Orange", "Banana")
+	botkit.StartDialog(ctx, "dlg")
 }

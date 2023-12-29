@@ -86,8 +86,8 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 		return ErrInvalidContext
 	}
 	dlg := &Dialog{
-		user: ctxMsg.From,
-		chat: ctxMsg.Chat,
+		userID: ctxMsg.From.ID,
+		chatID: ctxMsg.Chat.ID,
 		data: dialogData{
 			Name: name,
 		},
@@ -137,18 +137,18 @@ func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) erro
 	return &commander.UnknownCommandError{Cmd: cmd}
 }
 
-func (bot *Bot) getDialog(user *tgbotapi.User, chat *tgbotapi.Chat) *Dialog {
-	dataJson, err := bot.cache.Get(fmt.Sprintf("dialog:%d:%d", user.ID, chat.ID))
+func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
+	dataJson, err := bot.cache.Get(fmt.Sprintf("dialog:%d:%d", userID, chatID))
 	if err != nil {
 		bot.logger.Error("dialog not found",
-			slog.Any("user", user.ID),
-			slog.Any("chat", chat.ID),
+			slog.Any("userID", userID),
+			slog.Any("chatID", chatID),
 			slog.Any("err", err))
 		return nil
 	}
 	dlg := &Dialog{
-		user: user,
-		chat: chat,
+		userID: userID,
+		chatID: chatID,
 	}
 	err = json.Unmarshal([]byte(dataJson), &dlg.data)
 	if err != nil {
@@ -164,7 +164,7 @@ func (bot *Bot) saveDialog(dlg *Dialog) {
 		bot.logger.Error("failed to marshal dialog", slog.Any("err", err))
 		return
 	}
-	err = bot.cache.Set(fmt.Sprintf("dialog:%d:%d", dlg.user.ID, dlg.chat.ID), string(dataJson), bot.dialogTTL)
+	err = bot.cache.Set(fmt.Sprintf("dialog:%d:%d", dlg.userID, dlg.chatID), string(dataJson), bot.dialogTTL)
 	if err != nil {
 		bot.logger.Error("failed to save dialog", slog.Any("err", err))
 		return
@@ -172,14 +172,14 @@ func (bot *Bot) saveDialog(dlg *Dialog) {
 }
 
 func (bot *Bot) deleteDialog(dlg *Dialog) {
-	err := bot.cache.Del(fmt.Sprintf("dialog:%d:%d", dlg.user.ID, dlg.chat.ID))
+	err := bot.cache.Del(fmt.Sprintf("dialog:%d:%d", dlg.userID, dlg.chatID))
 	if err != nil {
 		bot.logger.Error("failed to delete dialog", slog.Any("err", err))
 	}
 }
 
-func (bot *Bot) handleDialog(user *tgbotapi.User, chat *tgbotapi.Chat, input any) bool {
-	dlg := bot.getDialog(user, chat)
+func (bot *Bot) handleDialog(userID, chatID int64, input any) bool {
+	dlg := bot.getDialog(userID, chatID)
 	if dlg == nil {
 		return false
 	}
@@ -259,7 +259,7 @@ func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
 }
 
 func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
-	if !bot.handleDialog(msg.From, msg.Chat, msg) && bot.defaultMsgHandler != nil {
+	if !bot.handleDialog(msg.From.ID, msg.Chat.ID, msg) && bot.defaultMsgHandler != nil {
 		ctx := context.Background()
 		ctx = ctxWithBot(ctx, bot)
 		ctx = ctxWithMessage(ctx, msg)
@@ -271,7 +271,7 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 }
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
-	if bot.handleDialog(q.From, q.Message.Chat, q) {
+	if bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
 		callback := tgbotapi.NewCallback(q.ID, q.Data)
 		if _, err := bot.api.Request(callback); err != nil {
 			bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))

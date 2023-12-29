@@ -2,8 +2,6 @@ package botkit
 
 import (
 	"context"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type DialogHandler func(context.Context, *Dialog) *Query
@@ -17,9 +15,9 @@ type dialogData struct {
 }
 
 type Dialog struct {
-	user *tgbotapi.User
-	chat *tgbotapi.Chat
-	data dialogData
+	userID int64
+	chatID int64
+	data   dialogData
 }
 
 func (dlg *Dialog) Query(queryName string) *Query {

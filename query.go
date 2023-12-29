@@ -74,7 +74,7 @@ func (qk QueryKind) HasChoiceResponse() bool {
 func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
 	switch q.Kind {
 	case TextInputQueryKind, SingleChoiceQueryKind, MultiChoiceQueryKind:
-		msg := tgbotapi.NewMessage(dlg.chat.ID, q.Text)
+		msg := tgbotapi.NewMessage(dlg.chatID, q.Text)
 		if kbm := q.getInlineKeybordMarkup(dlg); kbm != nil {
 			msg.ReplyMarkup = *kbm
 		}

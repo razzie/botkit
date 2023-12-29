@@ -115,6 +115,22 @@ func (bot *Bot) GetUserData(ctx context.Context, key string) (string, error) {
 	return bot.cache.Get(fmt.Sprintf("userdata:%d:%d:%s", ctxMsg.From.ID, ctxMsg.Chat.ID, key))
 }
 
+func (bot *Bot) SetChatData(ctx context.Context, key, data string, ttl time.Duration) error {
+	ctxMsg := CtxGetMessage(ctx)
+	if ctxMsg == nil {
+		return ErrInvalidContext
+	}
+	return bot.cache.Set(fmt.Sprintf("chatdata:%d:%s", ctxMsg.Chat.ID, key), data, ttl)
+}
+
+func (bot *Bot) GetChatData(ctx context.Context, key string) (string, error) {
+	ctxMsg := CtxGetMessage(ctx)
+	if ctxMsg == nil {
+		return "", ErrInvalidContext
+	}
+	return bot.cache.Get(fmt.Sprintf("chatdata:%d:%s", ctxMsg.Chat.ID, key))
+}
+
 func (bot *Bot) Close() error {
 	bot.api.StopReceivingUpdates()
 	return nil

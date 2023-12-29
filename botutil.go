@@ -45,3 +45,19 @@ func GetUserData(ctx context.Context, key string) (string, error) {
 	}
 	return bot.GetUserData(ctx, key)
 }
+
+func SetChatData(ctx context.Context, key, value string, ttl time.Duration) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.SetChatData(ctx, key, value, ttl)
+}
+
+func GetChatData(ctx context.Context, key string) (string, error) {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return "", ErrInvalidContext
+	}
+	return bot.GetChatData(ctx, key)
+}

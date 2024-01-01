@@ -89,7 +89,9 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 		userID: ctxMsg.From.ID,
 		chatID: ctxMsg.Chat.ID,
 		data: dialogData{
-			Name: name,
+			Name:      name,
+			Username:  ctxMsg.From.UserName,
+			IsPrivate: ctxMsg.Chat.IsPrivate(),
 		},
 	}
 	if q := h(ctx, dlg); q != nil {
@@ -156,7 +158,7 @@ func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) erro
 func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
 	dataJson, err := bot.cache.Get(fmt.Sprintf("dialog:%d:%d", userID, chatID))
 	if err != nil {
-		bot.logger.Error("dialog not found",
+		bot.logger.Debug("dialog not found",
 			slog.Any("userID", userID),
 			slog.Any("chatID", chatID),
 			slog.Any("err", err))
@@ -228,7 +230,9 @@ func (bot *Bot) handleDialog(userID, chatID int64, input any) bool {
 					input.Message.MessageID,
 					input.Message.Text,
 				)
-				editMsg.ReplyMarkup = lastQuery.getInlineKeybordMarkup(dlg)
+				if kbm, ok := lastQuery.getReplyMarkup(dlg).(tgbotapi.InlineKeyboardMarkup); ok {
+					editMsg.ReplyMarkup = &kbm
+				}
 				bot.send(editMsg)
 				bot.saveDialog(dlg)
 				return true
@@ -237,6 +241,10 @@ func (bot *Bot) handleDialog(userID, chatID int64, input any) bool {
 			return true
 		}
 	case *tgbotapi.Message:
+		if !input.Chat.IsPrivate() &&
+			(input.ReplyToMessage == nil || input.ReplyToMessage.MessageID != lastQuery.MessageID) {
+			return false
+		}
 		ctx = ctxWithMessage(ctx, input)
 		dlg.setUserResponse(input.Text)
 	default:
@@ -268,9 +276,11 @@ func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
 	cmd := msg.Command()
 	args := strings.Fields(msg.CommandArguments())
 	if err := bot.callCommand(cmd, ctx, args); err != nil {
-		msg := tgbotapi.NewMessage(msg.Chat.ID, err.Error())
-		//msg.ReplyToMessageID = msg.MessageID
-		bot.send(msg)
+		reply := tgbotapi.NewMessage(msg.Chat.ID, err.Error())
+		if !msg.Chat.IsPrivate() {
+			reply.ReplyToMessageID = msg.MessageID
+		}
+		bot.send(reply)
 	}
 }
 
@@ -287,11 +297,12 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 }
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
-	if bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
-		callback := tgbotapi.NewCallback(q.ID, "")
-		if _, err := bot.api.Request(callback); err != nil {
-			bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
-		}
+	callback := tgbotapi.NewCallback(q.ID, "")
+	if !bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
+		callback.Text = "Input not handled"
+	}
+	if _, err := bot.api.Request(callback); err != nil {
+		bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
 	}
 }
 

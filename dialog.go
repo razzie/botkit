@@ -8,6 +8,8 @@ type DialogHandler func(context.Context, *Dialog) *Query
 
 type dialogData struct {
 	Name            string                  `json:"name"`
+	Username        string                  `json:"username"`
+	IsPrivate       bool                    `json:"is_private"`
 	LastQuery       string                  `json:"last_query"`
 	Queries         map[string]Query        `json:"queries"`
 	Responses       map[string]string       `json:"responses"`

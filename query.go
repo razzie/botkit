@@ -74,17 +74,19 @@ func (qk QueryKind) HasChoiceResponse() bool {
 func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
 	switch q.Kind {
 	case TextInputQueryKind, SingleChoiceQueryKind, MultiChoiceQueryKind:
-		msg := tgbotapi.NewMessage(dlg.chatID, q.Text)
-		if kbm := q.getInlineKeybordMarkup(dlg); kbm != nil {
-			msg.ReplyMarkup = *kbm
+		msgText := q.Text
+		if !dlg.data.IsPrivate {
+			msgText = "@" + dlg.data.Username + " " + msgText
 		}
+		msg := tgbotapi.NewMessage(dlg.chatID, msgText)
+		msg.ReplyMarkup = q.getReplyMarkup(dlg)
 		return &msg, nil
 	default:
 		return nil, fmt.Errorf("unsupported/unknown query kind: %v", q.Kind)
 	}
 }
 
-func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMarkup {
+func (q *Query) getReplyMarkup(dlg *Dialog) any {
 	switch q.Kind {
 	case SingleChoiceQueryKind:
 		buttons := make([][]tgbotapi.InlineKeyboardButton, 0, len(q.Choices))
@@ -93,8 +95,7 @@ func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMark
 			btnData := strconv.Itoa(i) + ":" + q.Name
 			buttons = append(buttons, []tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(btnText, btnData)})
 		}
-		markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
-		return &markup
+		return tgbotapi.NewInlineKeyboardMarkup(buttons...)
 
 	case MultiChoiceQueryKind:
 		dlgChoices := dlg.data.ChoiceResponses[q.Name]
@@ -110,8 +111,16 @@ func (q *Query) getInlineKeybordMarkup(dlg *Dialog) *tgbotapi.InlineKeyboardMark
 			buttons = append(buttons, []tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData(btnText, btnData)})
 		}
 		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{tgbotapi.NewInlineKeyboardButtonData("OK", "done:"+q.Name)})
-		markup := tgbotapi.NewInlineKeyboardMarkup(buttons...)
-		return &markup
+		return tgbotapi.NewInlineKeyboardMarkup(buttons...)
+
+	case TextInputQueryKind:
+		if dlg.data.IsPrivate {
+			return nil
+		}
+		return tgbotapi.ForceReply{
+			ForceReply: true,
+			Selective:  true,
+		}
 
 	default:
 		return nil

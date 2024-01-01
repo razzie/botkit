@@ -50,7 +50,7 @@ func (db *DialogBuilder) AddSingleChoiceQuery(text string, validator func(resp i
 	}
 	step := dialogStep{
 		id:      id,
-		query:   NewSingleChoiseQuery(getQueryNameFromDialogStepID(id), text, choices...),
+		query:   NewSingleChoiceQuery(getQueryNameFromDialogStepID(id), text, choices...),
 		handler: h,
 	}
 	db.steps = append(db.steps, step)
@@ -67,7 +67,7 @@ func (db *DialogBuilder) AddMultiChoiceQuery(text string, validator func(resp []
 	}
 	step := dialogStep{
 		id:      id,
-		query:   NewMultiChoiseQuery(getQueryNameFromDialogStepID(id), text, choices...),
+		query:   NewMultiChoiceQuery(getQueryNameFromDialogStepID(id), text, choices...),
 		handler: h,
 	}
 	db.steps = append(db.steps, step)

@@ -35,7 +35,7 @@ func NewTextInputQuery(name, text string) *Query {
 	}
 }
 
-func NewSingleChoiseQuery(name, text string, choices ...string) *Query {
+func NewSingleChoiceQuery(name, text string, choices ...string) *Query {
 	return &Query{
 		Name:    name,
 		Kind:    SingleChoiceQueryKind,
@@ -44,7 +44,7 @@ func NewSingleChoiseQuery(name, text string, choices ...string) *Query {
 	}
 }
 
-func NewMultiChoiseQuery(name, text string, choices ...string) *Query {
+func NewMultiChoiceQuery(name, text string, choices ...string) *Query {
 	return &Query{
 		Name:    name,
 		Kind:    MultiChoiceQueryKind,

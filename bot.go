@@ -288,7 +288,7 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 	if bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
-		callback := tgbotapi.NewCallback(q.ID, q.Data)
+		callback := tgbotapi.NewCallback(q.ID, "")
 		if _, err := bot.api.Request(callback); err != nil {
 			bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
 		}

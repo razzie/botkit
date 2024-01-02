@@ -3,6 +3,7 @@ package botkit
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -32,6 +33,14 @@ type BotOptions struct {
 
 func WithAPIEndpoint(apiEndpoint string) BotOption {
 	return func(bo *BotOptions) {
+		if !strings.HasPrefix(apiEndpoint, "http://") && !strings.HasPrefix(apiEndpoint, "https://") {
+			apiEndpoint = "http://" + apiEndpoint
+		}
+		if strings.HasSuffix(apiEndpoint, "/") {
+			apiEndpoint += "bot%s/%s"
+		} else {
+			apiEndpoint += "/bot%s/%s"
+		}
 		bo.apiEndpoint = apiEndpoint
 	}
 }

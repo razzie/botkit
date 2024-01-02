@@ -16,10 +16,10 @@ github.com/puzpuzpuz/xsync/v3 v3.0.2 h1:3yESHrRFYr6xzkz61LLkvNiPFXxJEAABanTQpKbA
 github.com/puzpuzpuz/xsync/v3 v3.0.2/go.mod h1:VjzYrABPabuM4KyBh1Ftq6u8nhwY5tBPKP9jpmh0nnA=
 github.com/razzie/commander v0.0.0-20231214165917-c0f5eba90a02 h1:aMvKego2jQSQjj1lsWW/tZ7hiDCf+Dz+khwVQF/JQSc=
 github.com/razzie/commander v0.0.0-20231214165917-c0f5eba90a02/go.mod h1:Pe5CgaqiGDHCM33/gLn4utOwpY+rIX/nh+rZ0pD2flo=
-github.com/razzie/razcache v0.0.0-20231124200019-6e05ceecb80a h1:cAXwrZ9JFGe1NLk7Yz1QpX8pEe4aBMfwngyiFxuTqwQ=
-github.com/razzie/razcache v0.0.0-20231124200019-6e05ceecb80a/go.mod h1:efrqz/q6DebaS90mU+kbddmok4omCWnPoQV9/VrgouQ=
-github.com/redis/go-redis/v9 v9.3.0 h1:RiVDjmig62jIWp7Kk4XVLs0hzV6pI3PyTnnL0cnn0u0=
-github.com/redis/go-redis/v9 v9.3.0/go.mod h1:hdY0cQFCN4fnSYT6TkisLufl/4W5UIXyv0b/CLO2V2M=
+github.com/razzie/razcache v0.0.0-20240102195705-1942b46103c3 h1:r9n3Epu9lDcZB6T5cqZ/W0etAB6n+AZdeFdripjML/0=
+github.com/razzie/razcache v0.0.0-20240102195705-1942b46103c3/go.mod h1:efrqz/q6DebaS90mU+kbddmok4omCWnPoQV9/VrgouQ=
+github.com/redis/go-redis/v9 v9.3.1 h1:KqdY8U+3X6z+iACvumCNxnoluToB+9Me+TvyFa21Mds=
+github.com/redis/go-redis/v9 v9.3.1/go.mod h1:hdY0cQFCN4fnSYT6TkisLufl/4W5UIXyv0b/CLO2V2M=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=

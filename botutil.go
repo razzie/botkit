@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
+
+	"github.com/razzie/razcache"
 )
 
 type lazyDownloader struct {
@@ -67,36 +68,20 @@ func StartDialog(ctx context.Context, name string) error {
 	return bot.StartDialog(ctx, name)
 }
 
-func SetUserData(ctx context.Context, key, value string, ttl time.Duration) error {
+func GetUserCache(ctx context.Context) (razcache.Cache, error) {
 	bot := CtxGetBot(ctx)
 	if bot == nil {
-		return ErrInvalidContext
+		return nil, ErrInvalidContext
 	}
-	return bot.SetUserData(ctx, key, value, ttl)
+	return bot.GetUserCache(ctx)
 }
 
-func GetUserData(ctx context.Context, key string) (string, error) {
+func GetChatCache(ctx context.Context) (razcache.Cache, error) {
 	bot := CtxGetBot(ctx)
 	if bot == nil {
-		return "", ErrInvalidContext
+		return nil, ErrInvalidContext
 	}
-	return bot.GetUserData(ctx, key)
-}
-
-func SetChatData(ctx context.Context, key, value string, ttl time.Duration) error {
-	bot := CtxGetBot(ctx)
-	if bot == nil {
-		return ErrInvalidContext
-	}
-	return bot.SetChatData(ctx, key, value, ttl)
-}
-
-func GetChatData(ctx context.Context, key string) (string, error) {
-	bot := CtxGetBot(ctx)
-	if bot == nil {
-		return "", ErrInvalidContext
-	}
-	return bot.GetChatData(ctx, key)
+	return bot.GetChatCache(ctx)
 }
 
 func UploadFile(ctx context.Context, name string, r io.Reader) error {

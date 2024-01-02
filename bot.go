@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/razzie/commander"
@@ -104,36 +103,20 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 	return nil
 }
 
-func (bot *Bot) SetUserData(ctx context.Context, key, data string, ttl time.Duration) error {
+func (bot *Bot) GetUserCache(ctx context.Context) (razcache.Cache, error) {
 	ctxMsg := CtxGetMessage(ctx)
 	if ctxMsg == nil {
-		return ErrInvalidContext
+		return nil, ErrInvalidContext
 	}
-	return bot.cache.Set(fmt.Sprintf("userdata:%d:%d:%s", ctxMsg.From.ID, ctxMsg.Chat.ID, key), data, ttl)
+	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", ctxMsg.From.ID, ctxMsg.Chat.ID)), nil
 }
 
-func (bot *Bot) GetUserData(ctx context.Context, key string) (string, error) {
+func (bot *Bot) GetChatCache(ctx context.Context) (razcache.Cache, error) {
 	ctxMsg := CtxGetMessage(ctx)
 	if ctxMsg == nil {
-		return "", ErrInvalidContext
+		return nil, ErrInvalidContext
 	}
-	return bot.cache.Get(fmt.Sprintf("userdata:%d:%d:%s", ctxMsg.From.ID, ctxMsg.Chat.ID, key))
-}
-
-func (bot *Bot) SetChatData(ctx context.Context, key, data string, ttl time.Duration) error {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
-		return ErrInvalidContext
-	}
-	return bot.cache.Set(fmt.Sprintf("chatdata:%d:%s", ctxMsg.Chat.ID, key), data, ttl)
-}
-
-func (bot *Bot) GetChatData(ctx context.Context, key string) (string, error) {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
-		return "", ErrInvalidContext
-	}
-	return bot.cache.Get(fmt.Sprintf("chatdata:%d:%s", ctxMsg.Chat.ID, key))
+	return bot.cache.SubCache(fmt.Sprintf("chatdata:%d:", ctxMsg.Chat.ID)), nil
 }
 
 func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error {

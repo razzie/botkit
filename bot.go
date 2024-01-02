@@ -136,6 +136,29 @@ func (bot *Bot) GetChatData(ctx context.Context, key string) (string, error) {
 	return bot.cache.Get(fmt.Sprintf("chatdata:%d:%s", ctxMsg.Chat.ID, key))
 }
 
+func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error {
+	ctxMsg := CtxGetMessage(ctx)
+	if ctxMsg == nil {
+		return ErrInvalidContext
+	}
+	doc := tgbotapi.NewDocument(ctxMsg.Chat.ID, tgbotapi.FileReader{
+		Name:   name,
+		Reader: r,
+	})
+	_, err := bot.api.Send(doc)
+	return err
+}
+
+func (bot *Bot) UploadFileFromURL(ctx context.Context, url string) error {
+	ctxMsg := CtxGetMessage(ctx)
+	if ctxMsg == nil {
+		return ErrInvalidContext
+	}
+	doc := tgbotapi.NewDocument(ctxMsg.Chat.ID, tgbotapi.FileURL(url))
+	_, err := bot.api.Send(doc)
+	return err
+}
+
 func (bot *Bot) DownloadFile(fileID string) (io.ReadCloser, error) {
 	file, err := bot.api.GetFile(tgbotapi.FileConfig{FileID: fileID})
 	if err != nil {

@@ -99,6 +99,22 @@ func GetChatData(ctx context.Context, key string) (string, error) {
 	return bot.GetChatData(ctx, key)
 }
 
+func UploadFile(ctx context.Context, name string, r io.Reader) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.UploadFile(ctx, name, r)
+}
+
+func UploadFileFromURL(ctx context.Context, url string) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.UploadFileFromURL(ctx, url)
+}
+
 func DownloadFile(ctx context.Context, fileID string) (io.ReadCloser, error) {
 	bot := CtxGetBot(ctx)
 	if bot == nil {

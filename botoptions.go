@@ -11,16 +11,18 @@ import (
 )
 
 var defaultOptions = BotOptions{
-	apiEndpoint: tgbotapi.APIEndpoint,
-	logger:      slog.Default(),
-	timeout:     30,
-	dialogTTL:   time.Hour * 24,
+	apiEndpoint:  tgbotapi.APIEndpoint,
+	fileEndpoint: tgbotapi.FileEndpoint,
+	logger:       slog.Default(),
+	timeout:      30,
+	dialogTTL:    time.Hour * 24,
 }
 
 type BotOption func(*BotOptions)
 
 type BotOptions struct {
 	apiEndpoint       string
+	fileEndpoint      string
 	redisDSN          string
 	logger            *slog.Logger
 	offset            int
@@ -36,12 +38,11 @@ func WithAPIEndpoint(apiEndpoint string) BotOption {
 		if !strings.HasPrefix(apiEndpoint, "http://") && !strings.HasPrefix(apiEndpoint, "https://") {
 			apiEndpoint = "http://" + apiEndpoint
 		}
-		if strings.HasSuffix(apiEndpoint, "/") {
-			apiEndpoint += "bot%s/%s"
-		} else {
-			apiEndpoint += "/bot%s/%s"
+		if !strings.HasSuffix(apiEndpoint, "/") {
+			apiEndpoint += "/"
 		}
-		bo.apiEndpoint = apiEndpoint
+		bo.apiEndpoint = apiEndpoint + "bot%s/%s"
+		bo.fileEndpoint = apiEndpoint + "file/bot%s/%s"
 	}
 }
 

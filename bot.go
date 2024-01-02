@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 type Bot struct {
 	BotOptions
+	token string
 	cache razcache.Cache
 	api   *tgbotapi.BotAPI
 }
@@ -22,6 +24,7 @@ type Bot struct {
 func NewBot(token string, opts ...BotOption) (*Bot, error) {
 	bot := &Bot{
 		BotOptions: defaultOptions,
+		token:      token,
 	}
 	for _, opt := range opts {
 		opt(&bot.BotOptions)
@@ -131,6 +134,15 @@ func (bot *Bot) GetChatData(ctx context.Context, key string) (string, error) {
 		return "", ErrInvalidContext
 	}
 	return bot.cache.Get(fmt.Sprintf("chatdata:%d:%s", ctxMsg.Chat.ID, key))
+}
+
+func (bot *Bot) DownloadFile(fileID string) (io.ReadCloser, error) {
+	file, err := bot.api.GetFile(tgbotapi.FileConfig{FileID: fileID})
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf(bot.fileEndpoint, bot.token, file.FilePath)
+	return newLazyDownloader(url), nil
 }
 
 func (bot *Bot) Close() error {
@@ -298,7 +310,7 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 	callback := tgbotapi.NewCallback(q.ID, "")
-	if !bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
+	if q.Message == nil || !bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
 		callback.Text = "Input not handled"
 	}
 	if _, err := bot.api.Request(callback); err != nil {

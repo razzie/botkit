@@ -94,7 +94,7 @@ func (db *DialogBuilder) Build() DialogHandler {
 		resp := db.steps[id].getUserResponse(dlg)
 		handler := db.steps[id].handler
 		if err := handler(resp); err != nil {
-			SendMessage(ctx, "%v", err)
+			SendReply(ctx, "%v", err)
 			return RetryQuery
 		}
 

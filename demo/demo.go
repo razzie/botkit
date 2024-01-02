@@ -24,19 +24,25 @@ func main() {
 	}
 
 	dlg := botkit.NewDialogBuilder().
-		AddMultiChoiceQuery("Pick your favorite", func(resp []int, prev []any) error {
-			if len(resp) < 1 {
+		AddMultiChoiceQuery("Pick your favorite", func(choices []int) error {
+			if len(choices) < 1 {
 				return fmt.Errorf("pick at least one")
 			}
 			return nil
 		}, "Apple", "Orange", "Banana", "Grapes", "Melon").
-		AddTextInputQuery("Why?", nil).
+		AddTextInputQuery("Why?", func(resp string) error {
+			if len(resp) < 2 {
+				return fmt.Errorf("please write a longer response")
+			}
+			return nil
+		}).
 		SetFinalizer(func(ctx context.Context, responses []any) {
 			botkit.SendMessage(ctx, "responses: %v", responses)
 		}).
 		Build()
 
 	bot, err := botkit.NewBot(token,
+		//botkit.WithAPIEndpoint("localhost:8080"),
 		botkit.WithCommand("hello", cmdHelloWorld),
 		botkit.WithCommand("startdlg", cmdStartDialog),
 		botkit.WithDialog("dlg", dlg))

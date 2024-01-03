@@ -1,6 +1,7 @@
 package botkit
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -73,7 +74,8 @@ func (qk QueryKind) HasChoiceResponse() bool {
 func (q *Query) toChattable(dlg *Dialog) tgbotapi.Chattable {
 	msgText := q.Text
 	if !dlg.data.IsPrivate {
-		msgText = "@" + dlg.data.Username + " " + msgText
+		//msgText = "@" + dlg.data.Username + " " + msgText
+		msgText = fmt.Sprintf("[](tg://user?id=%d)", dlg.userID) + msgText
 	}
 	msg := tgbotapi.NewMessage(dlg.chatID, msgText)
 	msg.ReplyMarkup = q.getReplyMarkup(dlg)

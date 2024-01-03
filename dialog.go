@@ -18,7 +18,6 @@ type Dialog struct {
 
 type dialogData struct {
 	Name            string                  `json:"name"`
-	Username        string                  `json:"username"`
 	IsPrivate       bool                    `json:"is_private"`
 	LastQuery       string                  `json:"last_query"`
 	Queries         map[string]Query        `json:"queries"`
@@ -87,7 +86,6 @@ func (dlg *Dialog) handleInput(ctx context.Context, input any) (updates []dialog
 
 	switch input := input.(type) {
 	case *tgbotapi.CallbackQuery:
-		ctx = ctxWithMessage(ctx, input.Message)
 		if choice, isDone, ok := lastQuery.getChoiceFromCallbackData(input.Data); ok {
 			if !isDone {
 				dlg.flipUserChoice(choice)
@@ -110,7 +108,6 @@ func (dlg *Dialog) handleInput(ctx context.Context, input any) (updates []dialog
 			(input.ReplyToMessage == nil || input.ReplyToMessage.MessageID != lastQuery.MessageID) {
 			return nil, false, nil
 		}
-		ctx = ctxWithMessage(ctx, input)
 		dlg.setUserResponse(input.Text)
 	default:
 		return nil, false, fmt.Errorf("unhandled dialog input: %v", input)

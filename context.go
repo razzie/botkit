@@ -13,11 +13,30 @@ var (
 	ErrInvalidContext = fmt.Errorf("invalid context")
 
 	ctxBot     ctxKey = "ctxBot"
-	ctxMessage ctxKey = "ctxMessage"
+	ctxUserID  ctxKey = "ctxUser"
+	ctxChatID  ctxKey = "ctxChat"
+	ctxReplyID ctxKey = "ctxReplyID"
 )
 
-func ctxWithBot(ctx context.Context, bot *Bot) context.Context {
-	return context.WithValue(ctx, ctxBot, bot)
+func newContextWithUserAndChat(bot *Bot, userID, chatID int64) context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, ctxBot, bot)
+	ctx = context.WithValue(ctx, ctxUserID, userID)
+	ctx = context.WithValue(ctx, ctxChatID, chatID)
+	return ctx
+}
+
+func newDialogContext(bot *Bot, dlg *Dialog) context.Context {
+	return newContextWithUserAndChat(bot, dlg.userID, dlg.chatID)
+}
+
+func newContextWithMessage(bot *Bot, msg *tgbotapi.Message) context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, ctxBot, bot)
+	ctx = context.WithValue(ctx, ctxUserID, msg.From.ID)
+	ctx = context.WithValue(ctx, ctxChatID, msg.Chat.ID)
+	ctx = context.WithValue(ctx, ctxReplyID, msg.MessageID)
+	return ctx
 }
 
 func CtxGetBot(ctx context.Context) *Bot {
@@ -27,13 +46,13 @@ func CtxGetBot(ctx context.Context) *Bot {
 	return nil
 }
 
-func ctxWithMessage(ctx context.Context, msg *tgbotapi.Message) context.Context {
-	return context.WithValue(ctx, ctxMessage, msg)
+func CtxGetUserAndChat(ctx context.Context) (int64, int64, bool) {
+	userID, ok1 := ctx.Value(ctxUserID).(int64)
+	chatID, ok2 := ctx.Value(ctxChatID).(int64)
+	return userID, chatID, ok1 && ok2
 }
 
-func CtxGetMessage(ctx context.Context) *tgbotapi.Message {
-	if msg, ok := ctx.Value(ctxMessage).(*tgbotapi.Message); ok {
-		return msg
-	}
-	return nil
+func CtxGetReplyID(ctx context.Context) (int, bool) {
+	replyID, ok := ctx.Value(ctxReplyID).(int)
+	return replyID, ok
 }

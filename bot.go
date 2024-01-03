@@ -59,20 +59,20 @@ func (bot *Bot) Run() {
 				bot.handleMessage(update.Message)
 			}
 		}
-		if update.CallbackQuery != nil {
+		if update.CallbackQuery != nil && update.CallbackQuery.Message != nil {
 			bot.handleCallback(update.CallbackQuery)
 		}
 	}
 }
 
 func (bot *Bot) SendMessage(ctx context.Context, text string, reply bool) error {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
+	_, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
 		return ErrInvalidContext
 	}
-	msg := tgbotapi.NewMessage(ctxMsg.Chat.ID, text)
+	msg := tgbotapi.NewMessage(chatID, text)
 	if reply {
-		msg.ReplyToMessageID = ctxMsg.MessageID
+		msg.ReplyToMessageID = bot.getReplyIDFromCtx(ctx)
 	}
 	_, err := bot.api.Send(msg)
 	return err
@@ -83,17 +83,20 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 	if h == nil {
 		return fmt.Errorf("unknown dialog: %s", name)
 	}
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
+	userID, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
 		return ErrInvalidContext
 	}
+	chat, err := bot.api.GetChat(tgbotapi.ChatInfoConfig{ChatConfig: tgbotapi.ChatConfig{ChatID: chatID}})
+	if err != nil {
+		return err
+	}
 	dlg := &Dialog{
-		userID: ctxMsg.From.ID,
-		chatID: ctxMsg.Chat.ID,
+		userID: userID,
+		chatID: chatID,
 		data: dialogData{
 			Name:      name,
-			Username:  ctxMsg.From.UserName,
-			IsPrivate: ctxMsg.Chat.IsPrivate(),
+			IsPrivate: chat.IsPrivate(),
 		},
 		handler: h,
 	}
@@ -108,27 +111,27 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 }
 
 func (bot *Bot) GetUserCache(ctx context.Context) (razcache.Cache, error) {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
+	userID, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
 		return nil, ErrInvalidContext
 	}
-	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", ctxMsg.From.ID, ctxMsg.Chat.ID)), nil
+	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", userID, chatID)), nil
 }
 
 func (bot *Bot) GetChatCache(ctx context.Context) (razcache.Cache, error) {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
+	_, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
 		return nil, ErrInvalidContext
 	}
-	return bot.cache.SubCache(fmt.Sprintf("chatdata:%d:", ctxMsg.Chat.ID)), nil
+	return bot.cache.SubCache(fmt.Sprintf("chatdata:%d:", chatID)), nil
 }
 
 func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
+	_, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
 		return ErrInvalidContext
 	}
-	doc := tgbotapi.NewDocument(ctxMsg.Chat.ID, tgbotapi.FileReader{
+	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileReader{
 		Name:   name,
 		Reader: r,
 	})
@@ -137,11 +140,11 @@ func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error 
 }
 
 func (bot *Bot) UploadFileFromURL(ctx context.Context, url string) error {
-	ctxMsg := CtxGetMessage(ctx)
-	if ctxMsg == nil {
+	_, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
 		return ErrInvalidContext
 	}
-	doc := tgbotapi.NewDocument(ctxMsg.Chat.ID, tgbotapi.FileURL(url))
+	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileURL(url))
 	_, err := bot.api.Send(doc)
 	return err
 }
@@ -230,13 +233,8 @@ func (bot *Bot) deleteDialog(dlg *Dialog) {
 	}
 }
 
-func (bot *Bot) handleDialogInput(userID, chatID int64, input any) bool {
-	dlg := bot.getDialog(userID, chatID)
-	if dlg == nil {
-		return false
-	}
-	ctx := context.Background()
-	ctx = ctxWithBot(ctx, bot)
+func (bot *Bot) handleDialogInput(dlg *Dialog, input any) bool {
+	ctx := newDialogContext(bot, dlg)
 	updates, isDone, err := dlg.handleInput(ctx, input)
 	if err != nil {
 		bot.logger.Error("dialog error", slog.String("dlg", dlg.data.Name), slog.Any("err", err))
@@ -253,9 +251,7 @@ func (bot *Bot) handleDialogInput(userID, chatID int64, input any) bool {
 }
 
 func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
-	ctx := context.Background()
-	ctx = ctxWithBot(ctx, bot)
-	ctx = ctxWithMessage(ctx, msg)
+	ctx := newContextWithMessage(bot, msg)
 	cmd := msg.Command()
 	args := strings.Fields(msg.CommandArguments())
 	if err := bot.callCommand(cmd, ctx, args); err != nil {
@@ -268,10 +264,10 @@ func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
 }
 
 func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
-	if !bot.handleDialogInput(msg.From.ID, msg.Chat.ID, msg) && bot.defaultMsgHandler != nil {
-		ctx := context.Background()
-		ctx = ctxWithBot(ctx, bot)
-		ctx = ctxWithMessage(ctx, msg)
+	if dlg := bot.getDialog(msg.From.ID, msg.Chat.ID); dlg != nil && bot.handleDialogInput(dlg, msg) {
+		return
+	} else if bot.defaultMsgHandler != nil {
+		ctx := newContextWithMessage(bot, msg)
 		err := bot.defaultMsgHandler(ctx)
 		if err != nil {
 			bot.logger.Error("default message handler error", slog.Any("err", err))
@@ -281,10 +277,28 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 	callback := tgbotapi.NewCallback(q.ID, "")
-	if q.Message == nil || !bot.handleDialogInput(q.From.ID, q.Message.Chat.ID, q) {
+	if dlg := bot.getDialog(q.From.ID, q.Message.Chat.ID); dlg == nil || !bot.handleDialogInput(dlg, q) {
 		callback.Text = "Input not handled"
 	}
 	if _, err := bot.api.Request(callback); err != nil {
 		bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
 	}
+}
+
+func (bot *Bot) getReplyIDFromCtx(ctx context.Context) int {
+	if replyID, ok := CtxGetReplyID(ctx); ok {
+		return replyID
+	}
+	if userID, chatID, ok := CtxGetUserAndChat(ctx); ok {
+		dlg := bot.getDialog(userID, chatID)
+		if dlg == nil {
+			return 0
+		}
+		q := dlg.LastQuery()
+		if q == nil {
+			return 0
+		}
+		return q.MessageID
+	}
+	return 0
 }

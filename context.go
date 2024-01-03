@@ -2,6 +2,7 @@ package botkit
 
 import (
 	"context"
+	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -9,6 +10,8 @@ import (
 type ctxKey string
 
 var (
+	ErrInvalidContext = fmt.Errorf("invalid context")
+
 	ctxBot     ctxKey = "ctxBot"
 	ctxMessage ctxKey = "ctxMessage"
 )

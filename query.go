@@ -1,7 +1,6 @@
 package botkit
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -71,19 +70,18 @@ func (qk QueryKind) HasChoiceResponse() bool {
 	}
 }
 
-func (q *Query) toMessage(dlg *Dialog) (*tgbotapi.MessageConfig, error) {
-	switch q.Kind {
-	case TextInputQueryKind, SingleChoiceQueryKind, MultiChoiceQueryKind:
-		msgText := q.Text
-		if !dlg.data.IsPrivate {
-			msgText = "@" + dlg.data.Username + " " + msgText
-		}
-		msg := tgbotapi.NewMessage(dlg.chatID, msgText)
-		msg.ReplyMarkup = q.getReplyMarkup(dlg)
-		return &msg, nil
-	default:
-		return nil, fmt.Errorf("unsupported/unknown query kind: %v", q.Kind)
+func (q *Query) toChattable(dlg *Dialog) tgbotapi.Chattable {
+	msgText := q.Text
+	if !dlg.data.IsPrivate {
+		msgText = "@" + dlg.data.Username + " " + msgText
 	}
+	msg := tgbotapi.NewMessage(dlg.chatID, msgText)
+	msg.ReplyMarkup = q.getReplyMarkup(dlg)
+	return &msg
+}
+
+func (q *Query) setMessageID(messageID int) {
+	q.MessageID = messageID
 }
 
 func (q *Query) getReplyMarkup(dlg *Dialog) any {
@@ -127,11 +125,11 @@ func (q *Query) getReplyMarkup(dlg *Dialog) any {
 	}
 }
 
-func (q *Query) getDataFromCallback(cq *tgbotapi.CallbackQuery) (choice int, isDone, ok bool) {
-	if !strings.Contains(cq.Data, ":") {
+func (q *Query) getChoiceFromCallbackData(data string) (choice int, isDone, ok bool) {
+	if !strings.Contains(data, ":") {
 		return -1, false, false
 	}
-	parts := strings.SplitN(cq.Data, ":", 2)
+	parts := strings.SplitN(data, ":", 2)
 	data, queryName := parts[0], parts[1]
 	if queryName != q.Name {
 		return -1, false, false

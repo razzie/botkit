@@ -95,9 +95,13 @@ func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 			Username:  ctxMsg.From.UserName,
 			IsPrivate: ctxMsg.Chat.IsPrivate(),
 		},
+		handler: h,
 	}
-	if q := h(ctx, dlg); q != nil {
-		bot.handleQuery(dlg, q)
+	if q := dlg.handler(ctx, dlg); q != nil {
+		if q.Kind != RetryQueryKind {
+			bot.sendDialogMessage(dlg, q)
+			dlg.setLastQuery(*q)
+		}
 		bot.saveDialog(dlg)
 	}
 	return nil
@@ -165,6 +169,14 @@ func (bot *Bot) send(c tgbotapi.Chattable) (int, bool) {
 	return resp.MessageID, true
 }
 
+func (bot *Bot) sendDialogMessage(dlg *Dialog, msg dialogMessage) {
+	c := msg.toChattable(dlg)
+	msgID, ok := bot.send(c)
+	if ok {
+		msg.setMessageID(msgID)
+	}
+}
+
 func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) error {
 	if c, ok := bot.commands[cmd]; ok {
 		_, err := c.Call(ctx, args)
@@ -191,6 +203,10 @@ func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
 		bot.logger.Error("failed to unmarshal dialog", slog.Any("err", err))
 		return nil
 	}
+	if dlg.handler = bot.dialogs[dlg.data.Name]; dlg.handler == nil {
+		bot.logger.Error("missing handler for dialog", slog.Any("dlg", dlg.data.Name))
+		return nil
+	}
 	return dlg
 }
 
@@ -214,75 +230,24 @@ func (bot *Bot) deleteDialog(dlg *Dialog) {
 	}
 }
 
-func (bot *Bot) handleDialog(userID, chatID int64, input any) bool {
+func (bot *Bot) handleDialogInput(userID, chatID int64, input any) bool {
 	dlg := bot.getDialog(userID, chatID)
 	if dlg == nil {
 		return false
 	}
-
-	h := bot.dialogs[dlg.data.Name]
-	if h == nil {
-		bot.logger.Error("dialog not handled", slog.String("name", dlg.data.Name))
-		bot.deleteDialog(dlg)
-		return true
-	}
-
-	lastQuery := dlg.LastQuery()
-	if lastQuery == nil {
-		bot.logger.Error("last query missing", slog.String("name", dlg.data.Name))
-		bot.deleteDialog(dlg)
-		return true
-	}
-
 	ctx := context.Background()
 	ctx = ctxWithBot(ctx, bot)
-
-	switch input := input.(type) {
-	case *tgbotapi.CallbackQuery:
-		ctx = ctxWithMessage(ctx, input.Message)
-		if choice, isDone, ok := lastQuery.getDataFromCallback(input); ok {
-			if !isDone {
-				dlg.flipUserChoice(choice)
-				editMsg := tgbotapi.NewEditMessageText(
-					input.Message.Chat.ID,
-					input.Message.MessageID,
-					input.Message.Text,
-				)
-				if kbm, ok := lastQuery.getReplyMarkup(dlg).(tgbotapi.InlineKeyboardMarkup); ok {
-					editMsg.ReplyMarkup = &kbm
-				}
-				bot.send(editMsg)
-				bot.saveDialog(dlg)
-				return true
-			}
-		} else {
-			return true
-		}
-	case *tgbotapi.Message:
-		if !input.Chat.IsPrivate() &&
-			(input.ReplyToMessage == nil || input.ReplyToMessage.MessageID != lastQuery.MessageID) {
-			return false
-		}
-		ctx = ctxWithMessage(ctx, input)
-		dlg.setUserResponse(input.Text)
-	default:
-		bot.logger.Error("unhandled dialog input", slog.Any("input", input))
+	updates, isDone, err := dlg.handleInput(ctx, input)
+	if err != nil {
+		bot.logger.Error("dialog error", slog.String("dlg", dlg.data.Name), slog.Any("err", err))
 	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			bot.logger.Error("dialog panic", slog.String("name", dlg.data.Name), slog.Any("panic", r))
-			bot.deleteDialog(dlg)
-		}
-	}()
-	if q := h(ctx, dlg); q != nil {
-		if q.Kind == RetryQueryKind {
-			return true
-		}
-		bot.handleQuery(dlg, q)
-		bot.saveDialog(dlg)
-	} else {
+	for _, update := range updates {
+		bot.sendDialogMessage(dlg, update)
+	}
+	if isDone {
 		bot.deleteDialog(dlg)
+	} else {
+		bot.saveDialog(dlg)
 	}
 	return true
 }
@@ -303,7 +268,7 @@ func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
 }
 
 func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
-	if !bot.handleDialog(msg.From.ID, msg.Chat.ID, msg) && bot.defaultMsgHandler != nil {
+	if !bot.handleDialogInput(msg.From.ID, msg.Chat.ID, msg) && bot.defaultMsgHandler != nil {
 		ctx := context.Background()
 		ctx = ctxWithBot(ctx, bot)
 		ctx = ctxWithMessage(ctx, msg)
@@ -316,22 +281,10 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 	callback := tgbotapi.NewCallback(q.ID, "")
-	if q.Message == nil || !bot.handleDialog(q.From.ID, q.Message.Chat.ID, q) {
+	if q.Message == nil || !bot.handleDialogInput(q.From.ID, q.Message.Chat.ID, q) {
 		callback.Text = "Input not handled"
 	}
 	if _, err := bot.api.Request(callback); err != nil {
 		bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
-	}
-}
-
-func (bot *Bot) handleQuery(dlg *Dialog, q *Query) {
-	msg, err := q.toMessage(dlg)
-	if err != nil {
-		bot.logger.Error("failed to convert query to message", slog.Any("err", err))
-		return
-	}
-	if msgID, ok := bot.send(msg); ok {
-		q.MessageID = msgID
-		dlg.setLastQuery(*q)
 	}
 }

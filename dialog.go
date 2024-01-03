@@ -7,6 +7,11 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+const (
+	dialogInputText dialogInputKind = iota
+	dialogInputCallback
+)
+
 type DialogHandler func(context.Context, *Dialog) *Query
 
 type Dialog struct {
@@ -18,12 +23,15 @@ type Dialog struct {
 
 type dialogData struct {
 	Name            string                  `json:"name"`
+	Username        string                  `json:"username"`
 	IsPrivate       bool                    `json:"is_private"`
 	LastQuery       string                  `json:"last_query"`
-	Queries         map[string]Query        `json:"queries"`
+	Queries         map[string]*Query       `json:"queries"`
 	Responses       map[string]string       `json:"responses"`
 	ChoiceResponses map[string]map[int]bool `json:"choice_responses"`
 }
+
+type dialogInputKind int
 
 type dialogMessage interface {
 	toChattable(dlg *Dialog) tgbotapi.Chattable
@@ -35,10 +43,7 @@ type wrapperDialogMessage struct {
 }
 
 func (dlg *Dialog) Query(queryName string) *Query {
-	if q, ok := dlg.data.Queries[queryName]; ok {
-		return &q
-	}
-	return nil
+	return dlg.data.Queries[queryName]
 }
 
 func (dlg *Dialog) LastQuery() *Query {
@@ -78,24 +83,25 @@ func (dlg *Dialog) LastUserChoices() ([]int, bool) {
 	return dlg.UserChoices(dlg.data.LastQuery)
 }
 
-func (dlg *Dialog) handleInput(ctx context.Context, input any) (updates []dialogMessage, isDone bool, err error) {
+func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data string) (updates []dialogMessage, isDone bool, err error) {
 	lastQuery := dlg.LastQuery()
 	if lastQuery == nil {
 		return nil, true, fmt.Errorf("missing last query of dialog %q", dlg.data.Name)
 	}
 
-	switch input := input.(type) {
-	case *tgbotapi.CallbackQuery:
-		if choice, isDone, ok := lastQuery.getChoiceFromCallbackData(input.Data); ok {
+	switch kind {
+	case dialogInputCallback:
+		if choice, isDone, ok := lastQuery.getChoiceFromCallbackData(data); ok {
 			if !isDone {
 				dlg.flipUserChoice(choice)
 				if kbm, ok := lastQuery.getReplyMarkup(dlg).(tgbotapi.InlineKeyboardMarkup); ok {
 					update := tgbotapi.NewEditMessageText(
-						input.Message.Chat.ID,
-						input.Message.MessageID,
-						input.Message.Text,
+						dlg.chatID,
+						lastQuery.MessageID,
+						lastQuery.getMessageText(dlg),
 					)
 					update.ReplyMarkup = &kbm
+					update.ParseMode = tgbotapi.ModeMarkdownV2
 					updates = append(updates, newMessageFromChattable(update))
 				}
 				return updates, false, nil
@@ -103,14 +109,11 @@ func (dlg *Dialog) handleInput(ctx context.Context, input any) (updates []dialog
 		} else {
 			return nil, false, nil
 		}
-	case *tgbotapi.Message:
-		if !input.Chat.IsPrivate() &&
-			(input.ReplyToMessage == nil || input.ReplyToMessage.MessageID != lastQuery.MessageID) {
-			return nil, false, nil
-		}
-		dlg.setUserResponse(input.Text)
+	case dialogInputText:
+		dlg.setUserResponse(data)
 	default:
-		return nil, false, fmt.Errorf("unhandled dialog input: %v", input)
+		return nil, false, fmt.Errorf("unhandled dialog input: %v, %v", kind, data)
+
 	}
 
 	if q := dlg.handler(ctx, dlg); q != nil {
@@ -118,16 +121,16 @@ func (dlg *Dialog) handleInput(ctx context.Context, input any) (updates []dialog
 			return updates, false, nil
 		}
 		updates = append(updates, q)
-		dlg.setLastQuery(*q)
+		dlg.setLastQuery(q)
 		return updates, false, nil
 	}
 	return updates, true, nil
 }
 
-func (dlg *Dialog) setLastQuery(q Query) {
+func (dlg *Dialog) setLastQuery(q *Query) {
 	dlg.data.LastQuery = q.Name
 	if dlg.data.Queries == nil {
-		dlg.data.Queries = map[string]Query{q.Name: q}
+		dlg.data.Queries = map[string]*Query{q.Name: q}
 		return
 	}
 	dlg.data.Queries[q.Name] = q
@@ -139,6 +142,10 @@ func (dlg *Dialog) setUserResponse(response string) {
 		return
 	}
 	dlg.data.Responses[dlg.data.LastQuery] = response
+}
+
+func (dlg *Dialog) isPrivate() bool {
+	return dlg.data.IsPrivate
 }
 
 func (dlg *Dialog) flipUserChoice(choice int) {

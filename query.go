@@ -72,18 +72,23 @@ func (qk QueryKind) HasChoiceResponse() bool {
 }
 
 func (q *Query) toChattable(dlg *Dialog) tgbotapi.Chattable {
-	msgText := q.Text
-	if !dlg.data.IsPrivate {
-		//msgText = "@" + dlg.data.Username + " " + msgText
-		msgText = fmt.Sprintf("[](tg://user?id=%d)", dlg.userID) + msgText
-	}
+	msgText := q.getMessageText(dlg)
 	msg := tgbotapi.NewMessage(dlg.chatID, msgText)
+	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	msg.ReplyMarkup = q.getReplyMarkup(dlg)
 	return &msg
 }
 
 func (q *Query) setMessageID(messageID int) {
 	q.MessageID = messageID
+}
+
+func (q *Query) getMessageText(dlg *Dialog) string {
+	msgText := q.Text
+	if !dlg.isPrivate() {
+		msgText = fmt.Sprintf("[%s](tg://user?id=%d) %s", dlg.data.Username, dlg.userID, msgText)
+	}
+	return msgText
 }
 
 func (q *Query) getReplyMarkup(dlg *Dialog) any {
@@ -114,7 +119,7 @@ func (q *Query) getReplyMarkup(dlg *Dialog) any {
 		return tgbotapi.NewInlineKeyboardMarkup(buttons...)
 
 	case TextInputQueryKind:
-		if dlg.data.IsPrivate {
+		if dlg.isPrivate() {
 			return nil
 		}
 		return tgbotapi.ForceReply{

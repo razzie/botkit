@@ -52,11 +52,15 @@ func (bot *Bot) Run() {
 	updateConfig.Timeout = bot.timeout
 
 	for update := range bot.api.GetUpdatesChan(updateConfig) {
-		if update.Message != nil {
+		if msg := update.Message; msg != nil {
 			if update.Message.IsCommand() {
-				bot.handleCommand(update.Message)
-			} else {
-				bot.handleMessage(update.Message)
+				bot.handleCommand(msg)
+			} else if len(msg.Text) > 0 {
+				bot.handleMessage(msg)
+			} else if fileIDs := getFileIDsFromMessage(msg); len(fileIDs) > 0 {
+				for _, fileID := range fileIDs {
+					bot.handleFile(msg, fileID)
+				}
 			}
 		}
 		if update.CallbackQuery != nil && update.CallbackQuery.Message != nil {
@@ -245,6 +249,9 @@ func (bot *Bot) handleDialogInput(dlg *Dialog, kind dialogInputKind, data string
 	ctx := newDialogContext(bot, dlg)
 	updates, isDone, err := dlg.handleInput(ctx, kind, data)
 	if err != nil {
+		if err == errInvalidDialogInput {
+			return false
+		}
 		bot.logger.Error("dialog error", slog.String("dlg", dlg.data.Name), slog.Any("err", err))
 	}
 	for _, update := range updates {
@@ -304,6 +311,18 @@ func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 	}
 }
 
+func (bot *Bot) handleFile(msg *tgbotapi.Message, fileID string) {
+	if dlg := bot.getDialog(msg.From.ID, msg.Chat.ID); dlg != nil {
+		if !dlg.isPrivate() {
+			q := dlg.LastQuery()
+			if q == nil || msg.ReplyToMessage == nil || msg.ReplyToMessage.MessageID != q.MessageID {
+				return
+			}
+		}
+		bot.handleDialogInput(dlg, dialogInputFile, fileID)
+	}
+}
+
 func (bot *Bot) getReplyIDFromCtx(ctx context.Context) int {
 	if replyID, ok := CtxGetReplyID(ctx); ok {
 		return replyID
@@ -339,4 +358,29 @@ func (bot *Bot) getUsernameFromUserID(userID int64) (string, error) {
 		return chat.LastName, nil
 	}
 	return fmt.Sprintf("user:%d", userID), nil
+}
+
+func getFileIDsFromMessage(msg *tgbotapi.Message) (ids []string) {
+	if len(msg.Photo) > 0 {
+		ids = append(ids, msg.Photo[0].FileID)
+	}
+	if msg.Video != nil {
+		ids = append(ids, msg.Video.FileID)
+	}
+	if msg.VideoNote != nil {
+		ids = append(ids, msg.VideoNote.FileID)
+	}
+	if msg.Audio != nil {
+		ids = append(ids, msg.Audio.FileID)
+	}
+	if msg.Voice != nil {
+		ids = append(ids, msg.Voice.FileID)
+	}
+	if msg.Sticker != nil {
+		ids = append(ids, msg.Sticker.FileID)
+	}
+	if msg.Document != nil {
+		ids = append(ids, msg.Document.FileID)
+	}
+	return
 }

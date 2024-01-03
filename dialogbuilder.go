@@ -3,12 +3,13 @@ package botkit
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 )
 
 type DialogBuilder struct {
 	steps     []dialogStep
-	finalizer func(ctx context.Context, responses []any)
+	finalizer dialogFinalizer
 }
 
 type dialogStep struct {
@@ -18,59 +19,53 @@ type dialogStep struct {
 }
 
 type dialogStepHandler func(response any) error
+type dialogFinalizer func(ctx context.Context, responses []any)
 
 func NewDialogBuilder() *DialogBuilder {
 	return new(DialogBuilder)
 }
 
 func (db *DialogBuilder) AddTextInputQuery(text string, validator func(resp string) error) *DialogBuilder {
-	id := len(db.steps)
 	h := func(resp any) error {
 		return validator(resp.(string))
 	}
 	if validator == nil {
 		h = dummyDialogStepHandler
 	}
-	step := dialogStep{
-		id:      id,
-		query:   NewTextInputQuery(getQueryNameFromDialogStepID(id), text),
-		handler: h,
-	}
-	db.steps = append(db.steps, step)
+	db.addStep(TextInputQueryKind, text, h)
 	return db
 }
 
 func (db *DialogBuilder) AddSingleChoiceQuery(text string, validator func(choice int) error, choices ...string) *DialogBuilder {
-	id := len(db.steps)
 	h := func(resp any) error {
 		return validator(resp.([]int)[0])
 	}
 	if validator == nil {
 		h = dummyDialogStepHandler
 	}
-	step := dialogStep{
-		id:      id,
-		query:   NewSingleChoiceQuery(getQueryNameFromDialogStepID(id), text, choices...),
-		handler: h,
-	}
-	db.steps = append(db.steps, step)
+	db.addStep(SingleChoiceQueryKind, text, h).Choices = choices
 	return db
 }
 
 func (db *DialogBuilder) AddMultiChoiceQuery(text string, validator func(choices []int) error, choices ...string) *DialogBuilder {
-	id := len(db.steps)
 	h := func(resp any) error {
 		return validator(resp.([]int))
 	}
 	if validator == nil {
 		h = dummyDialogStepHandler
 	}
-	step := dialogStep{
-		id:      id,
-		query:   NewMultiChoiceQuery(getQueryNameFromDialogStepID(id), text, choices...),
-		handler: h,
+	db.addStep(MultiChoiceQueryKind, text, h).Choices = choices
+	return db
+}
+
+func (db *DialogBuilder) AddFileInputQuery(text string, validator func(io.ReadCloser) error) *DialogBuilder {
+	h := func(resp any) error {
+		return validator(resp.(io.ReadCloser))
 	}
-	db.steps = append(db.steps, step)
+	if validator == nil {
+		h = dummyDialogStepHandler
+	}
+	db.addStep(FileInputQueryKind, text, h)
 	return db
 }
 
@@ -91,7 +86,7 @@ func (db *DialogBuilder) Build() DialogHandler {
 		}
 
 		id, _ := getDialogStepIDFromQueryName(q.Name)
-		resp := db.steps[id].getUserResponse(dlg)
+		resp := db.steps[id].getUserResponse(ctx, dlg)
 		handler := db.steps[id].handler
 		if err := handler(resp); err != nil {
 			SendReply(ctx, "%v", err)
@@ -103,7 +98,7 @@ func (db *DialogBuilder) Build() DialogHandler {
 			if db.finalizer != nil {
 				resps := make([]any, len(db.steps))
 				for i := range resps {
-					resps[i] = db.steps[i].getUserResponse(dlg)
+					resps[i] = db.steps[i].getUserResponse(ctx, dlg)
 				}
 				db.finalizer(ctx, resps)
 			}
@@ -114,7 +109,23 @@ func (db *DialogBuilder) Build() DialogHandler {
 	}
 }
 
-func (ds *dialogStep) getUserResponse(dlg *Dialog) any {
+func (db *DialogBuilder) addStep(kind QueryKind, text string, handler dialogStepHandler) *Query {
+	id := len(db.steps)
+	query := &Query{
+		Name: getQueryNameFromDialogStepID(id),
+		Kind: kind,
+		Text: text,
+	}
+	step := dialogStep{
+		id:      id,
+		query:   query,
+		handler: handler,
+	}
+	db.steps = append(db.steps, step)
+	return query
+}
+
+func (ds *dialogStep) getUserResponse(ctx context.Context, dlg *Dialog) any {
 	switch ds.query.Kind {
 	case TextInputQueryKind:
 		resp, _ := dlg.UserResponse(ds.query.Name)
@@ -122,6 +133,10 @@ func (ds *dialogStep) getUserResponse(dlg *Dialog) any {
 	case SingleChoiceQueryKind, MultiChoiceQueryKind:
 		resp, _ := dlg.UserChoices(ds.query.Name)
 		return resp
+	case FileInputQueryKind:
+		resp, _ := dlg.UserResponse(ds.query.Name)
+		file, _ := CtxGetBot(ctx).DownloadFile(resp)
+		return file
 	default:
 		return nil
 	}

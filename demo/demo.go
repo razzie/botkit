@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -41,11 +42,23 @@ func main() {
 		}).
 		Build()
 
+	filedlg := botkit.NewDialogBuilder().
+		AddFileInputQuery("Upload a file", nil).
+		SetFinalizer(func(ctx context.Context, responses []any) {
+			file := responses[0].(io.ReadCloser)
+			p := make([]byte, 4)
+			file.Read(p)
+			botkit.SendReply(ctx, "%x", p)
+		}).
+		Build()
+
 	bot, err := botkit.NewBot(token,
 		//botkit.WithAPIEndpoint("localhost:8080"),
 		botkit.WithCommand("hello", cmdHelloWorld),
 		botkit.WithCommand("startdlg", cmdStartDialog),
-		botkit.WithDialog("dlg", dlg))
+		botkit.WithCommand("filedlg", cmdFileDialog),
+		botkit.WithDialog("dlg", dlg),
+		botkit.WithDialog("filedlg", filedlg))
 	if err != nil {
 		panic(err)
 	}
@@ -66,4 +79,8 @@ func cmdHelloWorld(ctx context.Context) {
 
 func cmdStartDialog(ctx context.Context) {
 	botkit.StartDialog(ctx, "dlg")
+}
+
+func cmdFileDialog(ctx context.Context) {
+	botkit.StartDialog(ctx, "filedlg")
 }

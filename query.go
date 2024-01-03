@@ -12,6 +12,7 @@ const (
 	TextInputQueryKind QueryKind = iota
 	SingleChoiceQueryKind
 	MultiChoiceQueryKind
+	FileInputQueryKind
 	RetryQueryKind
 )
 
@@ -53,9 +54,17 @@ func NewMultiChoiceQuery(name, text string, choices ...string) *Query {
 	}
 }
 
+func NewFileInputQuery(name, text string) *Query {
+	return &Query{
+		Name: name,
+		Kind: FileInputQueryKind,
+		Text: text,
+	}
+}
+
 func (qk QueryKind) HasTextResponse() bool {
 	switch qk {
-	case TextInputQueryKind:
+	case TextInputQueryKind, FileInputQueryKind:
 		return true
 	default:
 		return false

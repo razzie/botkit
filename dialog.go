@@ -10,7 +10,10 @@ import (
 const (
 	dialogInputText dialogInputKind = iota
 	dialogInputCallback
+	dialogInputFile
 )
+
+var errInvalidDialogInput = fmt.Errorf("invalid dialog input")
 
 type DialogHandler func(context.Context, *Dialog) *Query
 
@@ -91,6 +94,9 @@ func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data s
 
 	switch kind {
 	case dialogInputCallback:
+		if lastQuery.Kind != SingleChoiceQueryKind && lastQuery.Kind != MultiChoiceQueryKind {
+			return nil, false, errInvalidDialogInput
+		}
 		if choice, isDone, ok := lastQuery.getChoiceFromCallbackData(data); ok {
 			if !isDone {
 				dlg.flipUserChoice(choice)
@@ -109,11 +115,21 @@ func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data s
 		} else {
 			return nil, false, nil
 		}
-	case dialogInputText:
-		dlg.setUserResponse(data)
-	default:
-		return nil, false, fmt.Errorf("unhandled dialog input: %v, %v", kind, data)
 
+	case dialogInputText:
+		if lastQuery.Kind != TextInputQueryKind {
+			return nil, false, errInvalidDialogInput
+		}
+		dlg.setUserResponse(data)
+
+	case dialogInputFile:
+		if lastQuery.Kind != FileInputQueryKind {
+			return nil, false, errInvalidDialogInput
+		}
+		dlg.setUserResponse(data)
+
+	default:
+		return nil, false, errInvalidDialogInput
 	}
 
 	if q := dlg.handler(ctx, dlg); q != nil {

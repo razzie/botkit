@@ -293,7 +293,7 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 fallback:
 	if bot.defaultMsgHandler != nil {
 		ctx := newContextWithMessage(bot, msg)
-		err := bot.defaultMsgHandler(ctx)
+		err := bot.defaultMsgHandler(ctx, msg.Text)
 		if err != nil {
 			bot.logger.Error("default message handler error", slog.Any("err", err))
 		}

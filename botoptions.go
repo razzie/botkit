@@ -30,7 +30,7 @@ type BotOptions struct {
 	commands          map[string]*commander.Command
 	dialogs           map[string]DialogHandler
 	dialogTTL         time.Duration
-	defaultMsgHandler func(context.Context) error
+	defaultMsgHandler func(context.Context, string) error
 }
 
 func WithAPIEndpoint(apiEndpoint string) BotOption {
@@ -98,7 +98,7 @@ func WithDialogTTL(ttl time.Duration) BotOption {
 	}
 }
 
-func WithDefaultMessageHandler(h func(context.Context) error) BotOption {
+func WithDefaultMessageHandler(h func(context.Context, string) error) BotOption {
 	return func(bo *BotOptions) {
 		bo.defaultMsgHandler = h
 	}

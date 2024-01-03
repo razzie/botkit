@@ -46,6 +46,7 @@ func main() {
 		AddFileInputQuery("Upload a file", nil).
 		SetFinalizer(func(ctx context.Context, responses []any) {
 			file := responses[0].(io.ReadCloser)
+			defer file.Close()
 			p := make([]byte, 4)
 			file.Read(p)
 			botkit.SendReply(ctx, "%x", p)

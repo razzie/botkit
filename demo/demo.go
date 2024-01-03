@@ -56,6 +56,7 @@ func main() {
 	bot, err := botkit.NewBot(token,
 		//botkit.WithAPIEndpoint("localhost:8080"),
 		botkit.WithCommand("hello", cmdHelloWorld),
+		botkit.WithCommand("album", cmdAlbum),
 		botkit.WithCommand("startdlg", cmdStartDialog),
 		botkit.WithCommand("filedlg", cmdFileDialog),
 		botkit.WithDialog("dlg", dlg),
@@ -76,6 +77,12 @@ func main() {
 
 func cmdHelloWorld(ctx context.Context) {
 	botkit.SendMessage(ctx, "Hello World!")
+}
+
+func cmdAlbum(ctx context.Context) {
+	botkit.SendMedia(ctx,
+		botkit.NewPhoto(botkit.URLSource("https://gorzsony.com/img/razchess.png")),
+		botkit.NewPhoto(botkit.URLSource("https://gorzsony.com/img/razbox.png")))
 }
 
 func cmdStartDialog(ctx context.Context) {

@@ -60,6 +60,22 @@ func SendReply(ctx context.Context, format string, args ...any) error {
 	return bot.SendMessage(ctx, fmt.Sprintf(format, args...), true)
 }
 
+func SendMedia(ctx context.Context, media ...Media) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.SendMedia(ctx, false, media...)
+}
+
+func ReplyMedia(ctx context.Context, media ...Media) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.SendMedia(ctx, true, media...)
+}
+
 func StartDialog(ctx context.Context, name string) error {
 	bot := CtxGetBot(ctx)
 	if bot == nil {

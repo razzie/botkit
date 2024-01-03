@@ -82,6 +82,37 @@ func (bot *Bot) SendMessage(ctx context.Context, text string, reply bool) error 
 	return err
 }
 
+func (bot *Bot) SendMedia(ctx context.Context, reply bool, media ...Media) error {
+	if len(media) == 0 {
+		return nil
+	}
+
+	_, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
+		return ErrInvalidContext
+	}
+	replyID := 0
+	if reply {
+		replyID = bot.getReplyIDFromCtx(ctx)
+	}
+
+	if len(media) == 1 {
+		msg := media[0].toChattable(chatID, replyID)
+		_, err := bot.api.Send(msg)
+		return err
+
+	}
+
+	files := make([]any, len(media))
+	for i, media := range media {
+		files[i] = media.toInputMedia()
+	}
+	group := tgbotapi.NewMediaGroup(chatID, files)
+	group.ReplyToMessageID = replyID
+	_, err := bot.api.SendMediaGroup(group)
+	return err
+}
+
 func (bot *Bot) StartDialog(ctx context.Context, name string) error {
 	h := bot.dialogs[name]
 	if h == nil {

@@ -112,7 +112,7 @@ func (q *Query) getReplyMarkup(dlg *Dialog) any {
 		return tgbotapi.NewInlineKeyboardMarkup(buttons...)
 
 	case MultiChoiceQueryKind:
-		dlgChoices := dlg.data.ChoiceResponses[q.Name]
+		dlgChoices := dlg.getQueryData(q.Name).UserChoices
 		buttons := make([][]tgbotapi.InlineKeyboardButton, 0, len(q.Choices)+1)
 		for i, choice := range q.Choices {
 			btnText := choice

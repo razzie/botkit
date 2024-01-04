@@ -25,13 +25,18 @@ type Dialog struct {
 }
 
 type dialogData struct {
-	Name            string                  `json:"name"`
-	Username        string                  `json:"username"`
-	IsPrivate       bool                    `json:"is_private"`
-	LastQuery       string                  `json:"last_query"`
-	Queries         map[string]*Query       `json:"queries"`
-	Responses       map[string]string       `json:"responses"`
-	ChoiceResponses map[string]map[int]bool `json:"choice_responses"`
+	Name      string                `json:"name"`
+	Username  string                `json:"username"`
+	IsPrivate bool                  `json:"is_private"`
+	LastQuery string                `json:"last_query"`
+	Queries   map[string]*queryData `json:"queries"`
+}
+
+type queryData struct {
+	Query        *Query       `json:"query"`
+	UserResponse string       `json:"user_response"`
+	UserChoices  map[int]bool `json:"user_choices"`
+	ReplyID      int          `json:"reply_id"`
 }
 
 type dialogInputKind int
@@ -46,7 +51,10 @@ type wrapperDialogMessage struct {
 }
 
 func (dlg *Dialog) Query(queryName string) *Query {
-	return dlg.data.Queries[queryName]
+	if q := dlg.data.Queries[queryName]; q != nil {
+		return q.Query
+	}
+	return nil
 }
 
 func (dlg *Dialog) LastQuery() *Query {
@@ -58,11 +66,11 @@ func (dlg *Dialog) LastQueryName() string {
 }
 
 func (dlg *Dialog) UserResponse(queryName string) (string, bool) {
-	if q, ok := dlg.data.Queries[queryName]; !ok || !q.Kind.HasTextResponse() {
+	q := dlg.data.Queries[queryName]
+	if q == nil || !q.Query.Kind.HasTextResponse() {
 		return "", false
 	}
-	resp, ok := dlg.data.Responses[queryName]
-	return resp, ok
+	return q.UserResponse, true
 }
 
 func (dlg *Dialog) LastUserResponse() (string, bool) {
@@ -70,11 +78,11 @@ func (dlg *Dialog) LastUserResponse() (string, bool) {
 }
 
 func (dlg *Dialog) UserChoices(queryName string) (results []int, ok bool) {
-	if q, ok := dlg.data.Queries[queryName]; !ok || !q.Kind.HasChoiceResponse() {
+	q := dlg.data.Queries[queryName]
+	if q == nil || !q.Query.Kind.HasChoiceResponse() {
 		return nil, false
 	}
-	choices, ok := dlg.data.ChoiceResponses[queryName]
-	for choice, isSet := range choices {
+	for choice, isSet := range q.UserChoices {
 		if isSet {
 			results = append(results, choice)
 		}
@@ -86,25 +94,26 @@ func (dlg *Dialog) LastUserChoices() ([]int, bool) {
 	return dlg.UserChoices(dlg.data.LastQuery)
 }
 
-func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data string) (updates []dialogMessage, isDone bool, err error) {
-	lastQuery := dlg.LastQuery()
-	if lastQuery == nil {
+func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data string, replyID int) (updates []dialogMessage, isDone bool, err error) {
+	last := dlg.getQueryData(dlg.data.LastQuery)
+	if last == nil {
 		return nil, true, fmt.Errorf("missing last query of dialog %q", dlg.data.Name)
 	}
 
 	switch kind {
 	case dialogInputCallback:
-		if lastQuery.Kind != SingleChoiceQueryKind && lastQuery.Kind != MultiChoiceQueryKind {
+		if last.Query.Kind != SingleChoiceQueryKind && last.Query.Kind != MultiChoiceQueryKind {
 			return nil, false, errInvalidDialogInput
 		}
-		if choice, isDone, ok := lastQuery.getChoiceFromCallbackData(data); ok {
+		if choice, isDone, ok := last.Query.getChoiceFromCallbackData(data); ok {
+			last.ReplyID = last.Query.MessageID
 			if !isDone {
-				dlg.flipUserChoice(choice)
-				if kbm, ok := lastQuery.getReplyMarkup(dlg).(tgbotapi.InlineKeyboardMarkup); ok {
+				last.UserChoices[choice] = !last.UserChoices[choice]
+				if kbm, ok := last.Query.getReplyMarkup(dlg).(tgbotapi.InlineKeyboardMarkup); ok {
 					update := tgbotapi.NewEditMessageText(
 						dlg.chatID,
-						lastQuery.MessageID,
-						lastQuery.getMessageText(dlg),
+						last.Query.MessageID,
+						last.Query.getMessageText(dlg),
 					)
 					update.ReplyMarkup = &kbm
 					update.ParseMode = tgbotapi.ModeMarkdownV2
@@ -117,64 +126,61 @@ func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data s
 		}
 
 	case dialogInputText:
-		if lastQuery.Kind != TextInputQueryKind {
+		if last.Query.Kind != TextInputQueryKind {
 			return nil, false, errInvalidDialogInput
 		}
-		dlg.setUserResponse(data)
+		last.UserResponse = data
+		last.ReplyID = replyID
 
 	case dialogInputFile:
-		if lastQuery.Kind != FileInputQueryKind {
+		if last.Query.Kind != FileInputQueryKind {
 			return nil, false, errInvalidDialogInput
 		}
-		dlg.setUserResponse(data)
+		last.UserResponse = data
+		last.ReplyID = replyID
 
 	default:
 		return nil, false, errInvalidDialogInput
 	}
 
+	handlerUpdates, isDone := dlg.runHandler(ctx)
+	updates = append(updates, handlerUpdates...)
+	return updates, isDone, nil
+}
+
+func (dlg *Dialog) runHandler(ctx context.Context) (updates []dialogMessage, isDone bool) {
 	if q := dlg.handler(ctx, dlg); q != nil {
 		if q.Kind == RetryQueryKind {
-			return updates, false, nil
+			return updates, false
 		}
 		updates = append(updates, q)
 		dlg.setLastQuery(q)
-		return updates, false, nil
+		return updates, false
 	}
-	return updates, true, nil
+	return updates, true
+}
+
+func (dlg *Dialog) getQueryData(queryName string) *queryData {
+	if dlg.data.Queries == nil {
+		qdata := &queryData{UserChoices: make(map[int]bool)}
+		dlg.data.Queries = map[string]*queryData{queryName: qdata}
+		return qdata
+	}
+	if qdata := dlg.data.Queries[queryName]; qdata != nil {
+		return qdata
+	}
+	qdata := &queryData{UserChoices: make(map[int]bool)}
+	dlg.data.Queries[queryName] = qdata
+	return qdata
 }
 
 func (dlg *Dialog) setLastQuery(q *Query) {
 	dlg.data.LastQuery = q.Name
-	if dlg.data.Queries == nil {
-		dlg.data.Queries = map[string]*Query{q.Name: q}
-		return
-	}
-	dlg.data.Queries[q.Name] = q
-}
-
-func (dlg *Dialog) setUserResponse(response string) {
-	if dlg.data.Responses == nil {
-		dlg.data.Responses = map[string]string{dlg.data.LastQuery: response}
-		return
-	}
-	dlg.data.Responses[dlg.data.LastQuery] = response
+	dlg.getQueryData(q.Name).Query = q
 }
 
 func (dlg *Dialog) isPrivate() bool {
 	return dlg.data.IsPrivate
-}
-
-func (dlg *Dialog) flipUserChoice(choice int) {
-	if dlg.data.ChoiceResponses == nil {
-		dlg.data.ChoiceResponses = make(map[string]map[int]bool)
-	}
-	choices := dlg.data.ChoiceResponses[dlg.data.LastQuery]
-	if choices == nil {
-		choices = map[int]bool{choice: true}
-		dlg.data.ChoiceResponses[dlg.data.LastQuery] = choices
-		return
-	}
-	choices[choice] = !choices[choice]
 }
 
 func newMessageFromChattable(c tgbotapi.Chattable) dialogMessage {

@@ -16,6 +16,7 @@ var (
 	ctxUserID  ctxKey = "ctxUser"
 	ctxChatID  ctxKey = "ctxChat"
 	ctxReplyID ctxKey = "ctxReplyID"
+	ctxDialog  ctxKey = "ctxDialog"
 )
 
 func newContextWithUserAndChat(bot *Bot, userID, chatID int64) context.Context {
@@ -27,7 +28,9 @@ func newContextWithUserAndChat(bot *Bot, userID, chatID int64) context.Context {
 }
 
 func newDialogContext(bot *Bot, dlg *Dialog) context.Context {
-	return newContextWithUserAndChat(bot, dlg.userID, dlg.chatID)
+	ctx := newContextWithUserAndChat(bot, dlg.userID, dlg.chatID)
+	ctx = context.WithValue(ctx, ctxDialog, dlg)
+	return ctx
 }
 
 func newContextWithMessage(bot *Bot, msg *tgbotapi.Message) context.Context {
@@ -55,4 +58,11 @@ func CtxGetUserAndChat(ctx context.Context) (int64, int64, bool) {
 func CtxGetReplyID(ctx context.Context) (int, bool) {
 	replyID, ok := ctx.Value(ctxReplyID).(int)
 	return replyID, ok
+}
+
+func ctxGetDialog(ctx context.Context) *Dialog {
+	if dlg, ok := ctx.Value(ctxDialog).(*Dialog); ok {
+		return dlg
+	}
+	return nil
 }

@@ -48,8 +48,9 @@ func main() {
 			file := responses[0].(io.ReadCloser)
 			defer file.Close()
 			p := make([]byte, 4)
-			file.Read(p)
-			botkit.SendReply(ctx, "%x", p)
+			n, _ := file.Read(p)
+			p = p[:n]
+			botkit.SendReply(ctx, "First %d bytes in hex: %x", n, p)
 		}).
 		Build()
 

@@ -59,9 +59,12 @@ func main() {
 		botkit.WithCommand("album", cmdAlbum),
 		botkit.WithCommand("startdlg", cmdStartDialog),
 		botkit.WithCommand("filedlg", cmdFileDialog),
+		botkit.WithCommand("sticker", cmdSticker),
+		botkit.WithCommand("sum", cmdSum),
+		botkit.WithCommand("sumMany", cmdSumMany),
 		botkit.WithDialog("dlg", dlg),
 		botkit.WithDialog("filedlg", filedlg),
-		botkit.WithCommand("sticker", cmdSticker))
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -96,4 +99,16 @@ func cmdFileDialog(ctx context.Context) {
 
 func cmdSticker(ctx context.Context) {
 	botkit.SendSticker(ctx, "pizzabot", -1)
+}
+
+func cmdSum(ctx context.Context, a, b int) {
+	botkit.SendReply(ctx, "%d", a+b)
+}
+
+func cmdSumMany(ctx context.Context, numbers ...int) {
+	sum := 0
+	for _, n := range numbers {
+		sum += n
+	}
+	botkit.SendReply(ctx, "%d", sum)
 }

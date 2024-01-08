@@ -183,6 +183,21 @@ func (bot *Bot) GetUserCache(ctx context.Context) (razcache.Cache, error) {
 	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", userID, chatID)), nil
 }
 
+func (bot *Bot) GetTaggedUserCache(ctx context.Context, num int) (razcache.Cache, error) {
+	chatID, ok := CtxGetChat(ctx)
+	if !ok {
+		return nil, ErrInvalidContext
+	}
+	users, ok := CtxGetTaggedUsers(ctx)
+	if !ok {
+		return nil, ErrInvalidContext
+	}
+	if num < 0 || num >= len(users) {
+		return nil, fmt.Errorf("num %d out of range (%d tagged users)", num, len(users))
+	}
+	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", users[num], chatID)), nil
+}
+
 func (bot *Bot) GetChatCache(ctx context.Context) (razcache.Cache, error) {
 	chatID, ok := CtxGetChat(ctx)
 	if !ok {

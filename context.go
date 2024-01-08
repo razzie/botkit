@@ -12,11 +12,12 @@ type ctxKey string
 var (
 	ErrInvalidContext = fmt.Errorf("invalid context")
 
-	ctxBot     ctxKey = "ctxBot"
-	ctxUserID  ctxKey = "ctxUser"
-	ctxChatID  ctxKey = "ctxChat"
-	ctxReplyID ctxKey = "ctxReplyID"
-	ctxDialog  ctxKey = "ctxDialog"
+	ctxBot         ctxKey = "ctxBot"
+	ctxUserID      ctxKey = "ctxUser"
+	ctxChatID      ctxKey = "ctxChat"
+	ctxReplyID     ctxKey = "ctxReplyID"
+	ctxDialog      ctxKey = "ctxDialog"
+	ctxTaggedUsers ctxKey = "ctxTaggedUsers"
 )
 
 func newContextWithUserAndChat(bot *Bot, userID, chatID int64) context.Context {
@@ -34,11 +35,9 @@ func newDialogContext(bot *Bot, dlg *Dialog) context.Context {
 }
 
 func newContextWithMessage(bot *Bot, msg *tgbotapi.Message) context.Context {
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, ctxBot, bot)
-	ctx = context.WithValue(ctx, ctxUserID, msg.From.ID)
-	ctx = context.WithValue(ctx, ctxChatID, msg.Chat.ID)
+	ctx := newContextWithUserAndChat(bot, msg.From.ID, msg.Chat.ID)
 	ctx = context.WithValue(ctx, ctxReplyID, msg.MessageID)
+	ctx = context.WithValue(ctx, ctxTaggedUsers, getTaggedUsers(msg))
 	return ctx
 }
 
@@ -65,9 +64,28 @@ func CtxGetReplyID(ctx context.Context) (int, bool) {
 	return replyID, ok
 }
 
+func CtxGetTaggedUsers(ctx context.Context) ([]int64, bool) {
+	users, ok := ctx.Value(ctxTaggedUsers).([]int64)
+	return users, ok
+}
+
+func CtxGetTaggedUserCount(ctx context.Context) (int, bool) {
+	users, ok := ctx.Value(ctxTaggedUsers).([]int64)
+	return len(users), ok
+}
+
 func ctxGetDialog(ctx context.Context) *Dialog {
 	if dlg, ok := ctx.Value(ctxDialog).(*Dialog); ok {
 		return dlg
 	}
 	return nil
+}
+
+func getTaggedUsers(msg *tgbotapi.Message) (users []int64) {
+	for _, entity := range msg.Entities {
+		if entity.User != nil {
+			users = append(users, entity.User.ID)
+		}
+	}
+	return
 }

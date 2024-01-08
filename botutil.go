@@ -108,6 +108,14 @@ func GetUserCache(ctx context.Context) (razcache.Cache, error) {
 	return bot.GetUserCache(ctx)
 }
 
+func GetTaggedUserCache(ctx context.Context, num int) (razcache.Cache, error) {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return nil, ErrInvalidContext
+	}
+	return bot.GetTaggedUserCache(ctx, num)
+}
+
 func GetChatCache(ctx context.Context) (razcache.Cache, error) {
 	bot := CtxGetBot(ctx)
 	if bot == nil {

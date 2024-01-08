@@ -130,7 +130,10 @@ func (ds *dialogStep) getUserResponse(ctx context.Context, dlg *Dialog) any {
 	case TextInputQueryKind:
 		resp, _ := dlg.UserResponse(ds.query.Name)
 		return resp
-	case SingleChoiceQueryKind, MultiChoiceQueryKind:
+	case SingleChoiceQueryKind:
+		resp, _ := dlg.UserChoices(ds.query.Name)
+		return resp[0]
+	case MultiChoiceQueryKind:
 		resp, _ := dlg.UserChoices(ds.query.Name)
 		return resp
 	case FileInputQueryKind:

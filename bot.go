@@ -313,7 +313,7 @@ func (bot *Bot) deleteDialog(dlg *Dialog) {
 	}
 }
 
-func (bot *Bot) handleDialogInput(dlg *Dialog, kind dialogInputKind, data string, replyID int) bool {
+func (bot *Bot) handleDialogInput(ctx context.Context, dlg *Dialog, kind dialogInputKind, data string) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			bot.logger.Error("dialog panic", slog.String("name", dlg.data.Name), slog.Any("panic", r))
@@ -321,8 +321,8 @@ func (bot *Bot) handleDialogInput(dlg *Dialog, kind dialogInputKind, data string
 		}
 	}()
 
-	ctx := newDialogContext(bot, dlg)
-	updates, isDone, err := dlg.handleInput(ctx, kind, data, replyID)
+	ctx = ctxWithDialog(ctx, dlg)
+	updates, isDone, err := dlg.handleInput(ctx, kind, data)
 	if err != nil {
 		if err == errInvalidDialogInput {
 			return false
@@ -341,7 +341,7 @@ func (bot *Bot) handleDialogInput(dlg *Dialog, kind dialogInputKind, data string
 }
 
 func (bot *Bot) handleCommand(msg *tgbotapi.Message) {
-	ctx := newContextWithMessage(bot, msg)
+	ctx := newContext(bot, msg)
 	cmd := msg.Command()
 	args := strings.Fields(msg.CommandArguments())
 	if err := bot.callCommand(cmd, ctx, args); err != nil {
@@ -361,13 +361,14 @@ func (bot *Bot) handleMessage(msg *tgbotapi.Message) {
 				goto fallback
 			}
 		}
-		if bot.handleDialogInput(dlg, dialogInputText, msg.Text, msg.MessageID) {
+		ctx := newContext(bot, msg)
+		if bot.handleDialogInput(ctx, dlg, dialogInputText, msg.Text) {
 			return
 		}
 	}
 fallback:
 	if bot.defaultMsgHandler != nil {
-		ctx := newContextWithMessage(bot, msg)
+		ctx := newContext(bot, msg)
 		err := bot.defaultMsgHandler(ctx, msg.Text)
 		if err != nil {
 			bot.logger.Error("default message handler error", slog.Any("err", err))
@@ -377,9 +378,11 @@ fallback:
 
 func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 	callback := tgbotapi.NewCallback(q.ID, "Input not handled")
-	if dlg := bot.getDialog(q.From.ID, q.Message.Chat.ID); dlg != nil &&
-		bot.handleDialogInput(dlg, dialogInputCallback, q.Data, q.Message.MessageID) {
-		callback.Text = ""
+	if dlg := bot.getDialog(q.From.ID, q.Message.Chat.ID); dlg != nil {
+		ctx := newContext(bot, q.Message)
+		if bot.handleDialogInput(ctx, dlg, dialogInputCallback, q.Data) {
+			callback.Text = ""
+		}
 	}
 	if _, err := bot.api.Request(callback); err != nil {
 		bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
@@ -394,7 +397,8 @@ func (bot *Bot) handleFile(msg *tgbotapi.Message, fileID string) {
 				return
 			}
 		}
-		bot.handleDialogInput(dlg, dialogInputFile, fileID, msg.MessageID)
+		ctx := newContext(bot, msg)
+		bot.handleDialogInput(ctx, dlg, dialogInputFile, fileID)
 	}
 }
 

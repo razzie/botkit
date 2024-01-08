@@ -20,22 +20,11 @@ var (
 	ctxTaggedUsers ctxKey = "ctxTaggedUsers"
 )
 
-func newContextWithUserAndChat(bot *Bot, userID, chatID int64) context.Context {
+func newContext(bot *Bot, msg *tgbotapi.Message) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, ctxBot, bot)
-	ctx = context.WithValue(ctx, ctxUserID, userID)
-	ctx = context.WithValue(ctx, ctxChatID, chatID)
-	return ctx
-}
-
-func newDialogContext(bot *Bot, dlg *Dialog) context.Context {
-	ctx := newContextWithUserAndChat(bot, dlg.userID, dlg.chatID)
-	ctx = context.WithValue(ctx, ctxDialog, dlg)
-	return ctx
-}
-
-func newContextWithMessage(bot *Bot, msg *tgbotapi.Message) context.Context {
-	ctx := newContextWithUserAndChat(bot, msg.From.ID, msg.Chat.ID)
+	ctx = context.WithValue(ctx, ctxUserID, msg.From.ID)
+	ctx = context.WithValue(ctx, ctxChatID, msg.Chat.ID)
 	ctx = context.WithValue(ctx, ctxReplyID, msg.MessageID)
 	ctx = context.WithValue(ctx, ctxTaggedUsers, getTaggedUsers(msg))
 	return ctx
@@ -79,6 +68,10 @@ func ctxGetDialog(ctx context.Context) *Dialog {
 		return dlg
 	}
 	return nil
+}
+
+func ctxWithDialog(ctx context.Context, dlg *Dialog) context.Context {
+	return context.WithValue(ctx, ctxDialog, dlg)
 }
 
 func getTaggedUsers(msg *tgbotapi.Message) (users []int64) {

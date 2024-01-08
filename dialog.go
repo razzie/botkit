@@ -94,7 +94,7 @@ func (dlg *Dialog) LastUserChoices() ([]int, bool) {
 	return dlg.UserChoices(dlg.data.LastQuery)
 }
 
-func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data string, replyID int) (updates []dialogMessage, isDone bool, err error) {
+func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data string) (updates []dialogMessage, isDone bool, err error) {
 	last := dlg.getQueryData(dlg.data.LastQuery)
 	if last == nil {
 		return nil, true, fmt.Errorf("missing last query of dialog %q", dlg.data.Name)
@@ -130,14 +130,14 @@ func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data s
 			return nil, false, errInvalidDialogInput
 		}
 		last.UserResponse = data
-		last.ReplyID = replyID
+		last.ReplyID, _ = CtxGetReplyID(ctx)
 
 	case dialogInputFile:
 		if last.Query.Kind != FileInputQueryKind {
 			return nil, false, errInvalidDialogInput
 		}
 		last.UserResponse = data
-		last.ReplyID = replyID
+		last.ReplyID, _ = CtxGetReplyID(ctx)
 
 	default:
 		return nil, false, errInvalidDialogInput

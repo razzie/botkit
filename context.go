@@ -49,6 +49,11 @@ func CtxGetBot(ctx context.Context) *Bot {
 	return nil
 }
 
+func CtxGetChat(ctx context.Context) (int64, bool) {
+	chatID, ok := ctx.Value(ctxChatID).(int64)
+	return chatID, ok
+}
+
 func CtxGetUserAndChat(ctx context.Context) (int64, int64, bool) {
 	userID, ok1 := ctx.Value(ctxUserID).(int64)
 	chatID, ok2 := ctx.Value(ctxChatID).(int64)

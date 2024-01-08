@@ -74,7 +74,7 @@ func (bot *Bot) Run() {
 }
 
 func (bot *Bot) SendMessage(ctx context.Context, text string, reply bool) error {
-	_, chatID, ok := CtxGetUserAndChat(ctx)
+	chatID, ok := CtxGetChat(ctx)
 	if !ok {
 		return ErrInvalidContext
 	}
@@ -91,7 +91,7 @@ func (bot *Bot) SendMedia(ctx context.Context, reply bool, media ...Media) error
 		return nil
 	}
 
-	_, chatID, ok := CtxGetUserAndChat(ctx)
+	chatID, ok := CtxGetChat(ctx)
 	if !ok {
 		return ErrInvalidContext
 	}
@@ -118,7 +118,7 @@ func (bot *Bot) SendMedia(ctx context.Context, reply bool, media ...Media) error
 }
 
 func (bot *Bot) SendSticker(ctx context.Context, stickerSet string, num int, reply bool) error {
-	_, chatID, ok := CtxGetUserAndChat(ctx)
+	chatID, ok := CtxGetChat(ctx)
 	if !ok {
 		return ErrInvalidContext
 	}
@@ -184,7 +184,7 @@ func (bot *Bot) GetUserCache(ctx context.Context) (razcache.Cache, error) {
 }
 
 func (bot *Bot) GetChatCache(ctx context.Context) (razcache.Cache, error) {
-	_, chatID, ok := CtxGetUserAndChat(ctx)
+	chatID, ok := CtxGetChat(ctx)
 	if !ok {
 		return nil, ErrInvalidContext
 	}
@@ -192,7 +192,7 @@ func (bot *Bot) GetChatCache(ctx context.Context) (razcache.Cache, error) {
 }
 
 func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error {
-	_, chatID, ok := CtxGetUserAndChat(ctx)
+	chatID, ok := CtxGetChat(ctx)
 	if !ok {
 		return ErrInvalidContext
 	}
@@ -205,7 +205,7 @@ func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error 
 }
 
 func (bot *Bot) UploadFileFromURL(ctx context.Context, url string) error {
-	_, chatID, ok := CtxGetUserAndChat(ctx)
+	chatID, ok := CtxGetChat(ctx)
 	if !ok {
 		return ErrInvalidContext
 	}

@@ -60,7 +60,8 @@ func main() {
 		botkit.WithCommand("startdlg", cmdStartDialog),
 		botkit.WithCommand("filedlg", cmdFileDialog),
 		botkit.WithDialog("dlg", dlg),
-		botkit.WithDialog("filedlg", filedlg))
+		botkit.WithDialog("filedlg", filedlg),
+		botkit.WithCommand("sticker", cmdSticker))
 	if err != nil {
 		panic(err)
 	}
@@ -91,4 +92,8 @@ func cmdStartDialog(ctx context.Context) {
 
 func cmdFileDialog(ctx context.Context) {
 	botkit.StartDialog(ctx, "filedlg")
+}
+
+func cmdSticker(ctx context.Context) {
+	botkit.SendSticker(ctx, "pizzabot", -1)
 }

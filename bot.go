@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/razzie/commander"
@@ -18,12 +20,14 @@ type Bot struct {
 	token string
 	cache razcache.Cache
 	api   *tgbotapi.BotAPI
+	rand  rand.Rand
 }
 
 func NewBot(token string, opts ...BotOption) (*Bot, error) {
 	bot := &Bot{
 		BotOptions: defaultOptions,
 		token:      token,
+		rand:       *rand.New(rand.NewSource(time.Now().Unix())),
 	}
 	for _, opt := range opts {
 		opt(&bot.BotOptions)
@@ -110,6 +114,30 @@ func (bot *Bot) SendMedia(ctx context.Context, reply bool, media ...Media) error
 	group := tgbotapi.NewMediaGroup(chatID, files)
 	group.ReplyToMessageID = replyID
 	_, err := bot.api.SendMediaGroup(group)
+	return err
+}
+
+func (bot *Bot) SendSticker(ctx context.Context, stickerSet string, num int, reply bool) error {
+	_, chatID, ok := CtxGetUserAndChat(ctx)
+	if !ok {
+		return ErrInvalidContext
+	}
+	stickers, err := bot.api.GetStickerSet(tgbotapi.GetStickerSetConfig{Name: stickerSet})
+	if err != nil {
+		return err
+	}
+	stickerCount := len(stickers.Stickers)
+	if stickerCount == 0 {
+		return fmt.Errorf("no stickers in set %q", stickerSet)
+	}
+	if num >= stickerCount {
+		return fmt.Errorf("sticker number %d out of range (0-%d)", num, stickerCount-1)
+	}
+	if num < 0 {
+		num = bot.rand.Intn(stickerCount)
+	}
+	sticker := tgbotapi.NewSticker(chatID, tgbotapi.FileID(stickers.Stickers[num].FileID))
+	_, err = bot.api.Send(sticker)
 	return err
 }
 

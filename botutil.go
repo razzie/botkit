@@ -76,6 +76,22 @@ func ReplyMedia(ctx context.Context, media ...Media) error {
 	return bot.SendMedia(ctx, true, media...)
 }
 
+func SendSticker(ctx context.Context, stickerSet string, num int) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.SendSticker(ctx, stickerSet, num, false)
+}
+
+func ReplySticker(ctx context.Context, stickerSet string, num int) error {
+	bot := CtxGetBot(ctx)
+	if bot == nil {
+		return ErrInvalidContext
+	}
+	return bot.SendSticker(ctx, stickerSet, num, true)
+}
+
 func StartDialog(ctx context.Context, name string) error {
 	bot := CtxGetBot(ctx)
 	if bot == nil {

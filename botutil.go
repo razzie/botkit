@@ -41,7 +41,12 @@ func (dl *lazyDownloader) Read(p []byte) (int, error) {
 }
 
 func (dl *lazyDownloader) Close() error {
-	return dl.reader.Close()
+	if dl.reader == nil {
+		return nil
+	}
+	err := dl.reader.Close()
+	dl.reader = nil
+	return err
 }
 
 func SendMessage(ctx context.Context, format string, args ...any) error {

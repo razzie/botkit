@@ -58,12 +58,18 @@ func (db *DialogBuilder) AddMultiChoiceQuery(text string, validator func(choices
 	return db
 }
 
-func (db *DialogBuilder) AddFileInputQuery(text string, validator func(io.ReadCloser) error) *DialogBuilder {
+func (db *DialogBuilder) AddFileInputQuery(text string, validator func(io.Reader) error) *DialogBuilder {
 	h := func(resp any) error {
-		return validator(resp.(io.ReadCloser))
+		reader := resp.(io.ReadCloser)
+		defer reader.Close()
+		return validator(reader)
 	}
 	if validator == nil {
-		h = dummyDialogStepHandler
+		h = func(resp any) error {
+			reader := resp.(io.ReadCloser)
+			reader.Close()
+			return nil
+		}
 	}
 	db.addStep(FileInputQueryKind, text, h)
 	return db

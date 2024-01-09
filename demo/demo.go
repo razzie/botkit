@@ -45,8 +45,7 @@ func main() {
 	filedlg := botkit.NewDialogBuilder().
 		AddFileInputQuery("Upload a file", nil).
 		SetFinalizer(func(ctx context.Context, responses []any) {
-			file := responses[0].(io.ReadCloser)
-			defer file.Close()
+			file := responses[0].(io.Reader)
 			p := make([]byte, 4)
 			n, _ := file.Read(p)
 			p = p[:n]

@@ -73,174 +73,36 @@ func (bot *Bot) Run() {
 	}
 }
 
-func (bot *Bot) SendMessage(ctx context.Context, text string, reply bool) error {
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return ErrInvalidContext
-	}
-	msg := tgbotapi.NewMessage(chatID, text)
-	if reply {
-		msg.ReplyToMessageID = bot.getReplyIDFromCtx(ctx)
-	}
-	_, err := bot.api.Send(msg)
-	return err
-}
-
-func (bot *Bot) SendMedia(ctx context.Context, reply bool, media ...Media) error {
-	if len(media) == 0 {
-		return nil
-	}
-
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return ErrInvalidContext
-	}
-	replyID := 0
-	if reply {
-		replyID = bot.getReplyIDFromCtx(ctx)
-	}
-
-	if len(media) == 1 {
-		msg := media[0].toChattable(chatID, replyID)
-		_, err := bot.api.Send(msg)
-		return err
-
-	}
-
-	files := make([]any, len(media))
-	for i, media := range media {
-		files[i] = media.toInputMedia()
-	}
-	group := tgbotapi.NewMediaGroup(chatID, files)
-	group.ReplyToMessageID = replyID
-	_, err := bot.api.SendMediaGroup(group)
-	return err
-}
-
-func (bot *Bot) SendSticker(ctx context.Context, stickerSet string, num int, reply bool) error {
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return ErrInvalidContext
-	}
-	stickers, err := bot.api.GetStickerSet(tgbotapi.GetStickerSetConfig{Name: stickerSet})
-	if err != nil {
-		return err
-	}
-	stickerCount := len(stickers.Stickers)
-	if stickerCount == 0 {
-		return fmt.Errorf("no stickers in set %q", stickerSet)
-	}
-	if num >= stickerCount {
-		return fmt.Errorf("sticker number %d out of range (0-%d)", num, stickerCount-1)
-	}
-	if num < 0 {
-		num = bot.rand.Intn(stickerCount)
-	}
-	sticker := tgbotapi.NewSticker(chatID, tgbotapi.FileID(stickers.Stickers[num].FileID))
-	_, err = bot.api.Send(sticker)
-	return err
-}
-
-func (bot *Bot) StartDialog(ctx context.Context, name string) error {
-	h := bot.dialogs[name]
-	if h == nil {
-		return fmt.Errorf("unknown dialog: %s", name)
-	}
-	userID, chatID, ok := CtxGetUserAndChat(ctx)
-	if !ok {
-		return ErrInvalidContext
-	}
-	chat, err := bot.getChat(chatID)
-	if err != nil {
-		return err
-	}
-	username, _ := bot.getUsernameFromUserID(userID)
-	dlg := &Dialog{
-		userID: userID,
-		chatID: chatID,
-		data: dialogData{
-			Name:      name,
-			Username:  username,
-			IsPrivate: chat.IsPrivate(),
-		},
-		handler: h,
-	}
-	updates, isDone := dlg.runHandler(ctx)
-	for _, update := range updates {
-		bot.sendDialogMessage(dlg, update)
-	}
-	if !isDone {
-		bot.saveDialog(dlg)
-	}
-	return nil
-}
-
-func (bot *Bot) GetUserCache(ctx context.Context) (razcache.Cache, error) {
-	userID, chatID, ok := CtxGetUserAndChat(ctx)
-	if !ok {
-		return nil, ErrInvalidContext
-	}
-	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", userID, chatID)), nil
-}
-
-func (bot *Bot) GetTaggedUserCache(ctx context.Context, num int) (razcache.Cache, error) {
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return nil, ErrInvalidContext
-	}
-	users, ok := CtxGetTaggedUsers(ctx)
-	if !ok {
-		return nil, ErrInvalidContext
-	}
-	if num < 0 || num >= len(users) {
-		return nil, fmt.Errorf("num %d out of range (%d tagged users)", num, len(users))
-	}
-	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", users[num], chatID)), nil
-}
-
-func (bot *Bot) GetChatCache(ctx context.Context) (razcache.Cache, error) {
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return nil, ErrInvalidContext
-	}
-	return bot.cache.SubCache(fmt.Sprintf("chatdata:%d:", chatID)), nil
-}
-
-func (bot *Bot) UploadFile(ctx context.Context, name string, r io.Reader) error {
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return ErrInvalidContext
-	}
-	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileReader{
-		Name:   name,
-		Reader: r,
-	})
-	_, err := bot.api.Send(doc)
-	return err
-}
-
-func (bot *Bot) UploadFileFromURL(ctx context.Context, url string) error {
-	chatID, ok := CtxGetChat(ctx)
-	if !ok {
-		return ErrInvalidContext
-	}
-	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileURL(url))
-	_, err := bot.api.Send(doc)
-	return err
-}
-
-func (bot *Bot) DownloadFile(fileID string) (io.ReadCloser, error) {
-	file, err := bot.api.GetFile(tgbotapi.FileConfig{FileID: fileID})
-	if err != nil {
-		return nil, err
-	}
-	url := fmt.Sprintf(bot.fileEndpoint, bot.token, file.FilePath)
-	return newLazyDownloader(url), nil
-}
-
 func (bot *Bot) Close() error {
 	bot.api.StopReceivingUpdates()
 	return nil
+}
+
+func (bot *Bot) getChatCache(chatID int64) (razcache.Cache, error) {
+	return bot.cache.SubCache(fmt.Sprintf("chatdata:%d:", chatID)), nil
+}
+
+func (bot *Bot) getUserCache(userID, chatID int64) (razcache.Cache, error) {
+	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", userID, chatID)), nil
+}
+
+func (bot *Bot) getChat(chatID int64) (tgbotapi.Chat, error) {
+	return bot.api.GetChat(tgbotapi.ChatInfoConfig{ChatConfig: tgbotapi.ChatConfig{ChatID: chatID}})
+}
+
+func (bot *Bot) getUsernameFromUserID(userID int64) (string, error) {
+	chat, err := bot.getChat(userID)
+	if err != nil {
+		return fmt.Sprintf("user:%d", userID), err
+	}
+	if len(chat.UserName) > 0 {
+		return chat.UserName, nil
+	} else if len(chat.FirstName) > 0 {
+		return chat.FirstName, nil
+	} else if len(chat.LastName) > 0 {
+		return chat.LastName, nil
+	}
+	return fmt.Sprintf("user:%d", userID), nil
 }
 
 func (bot *Bot) send(c tgbotapi.Chattable) (int, bool) {
@@ -260,12 +122,116 @@ func (bot *Bot) sendDialogMessage(dlg *Dialog, msg dialogMessage) {
 	}
 }
 
+func (bot *Bot) sendMessage(chatID int64, text string, replyID int) error {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ReplyToMessageID = replyID
+	_, err := bot.api.Send(msg)
+	return err
+}
+
+func (bot *Bot) sendMedia(chatID int64, replyID int, media ...Media) error {
+	if len(media) == 0 {
+		return nil
+	}
+
+	if len(media) == 1 {
+		msg := media[0].toChattable(chatID, replyID)
+		_, err := bot.api.Send(msg)
+		return err
+
+	}
+
+	files := make([]any, len(media))
+	for i, media := range media {
+		files[i] = media.toInputMedia()
+	}
+	group := tgbotapi.NewMediaGroup(chatID, files)
+	group.ReplyToMessageID = replyID
+	_, err := bot.api.SendMediaGroup(group)
+	return err
+}
+
+func (bot *Bot) sendSticker(chatID int64, stickerSet string, num int, replyID int) error {
+	stickers, err := bot.api.GetStickerSet(tgbotapi.GetStickerSetConfig{Name: stickerSet})
+	if err != nil {
+		return err
+	}
+	stickerCount := len(stickers.Stickers)
+	if stickerCount == 0 {
+		return fmt.Errorf("no stickers in set %q", stickerSet)
+	}
+	if num >= stickerCount {
+		return fmt.Errorf("sticker number %d out of range (0-%d)", num, stickerCount-1)
+	}
+	if num < 0 {
+		num = bot.rand.Intn(stickerCount)
+	}
+	sticker := tgbotapi.NewSticker(chatID, tgbotapi.FileID(stickers.Stickers[num].FileID))
+	sticker.ReplyToMessageID = replyID
+	_, err = bot.api.Send(sticker)
+	return err
+}
+
+func (bot *Bot) uploadFile(chatID int64, name string, r io.Reader) error {
+	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileReader{
+		Name:   name,
+		Reader: r,
+	})
+	_, err := bot.api.Send(doc)
+	return err
+}
+
+func (bot *Bot) uploadFileFromURL(chatID int64, url string) error {
+	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileURL(url))
+	_, err := bot.api.Send(doc)
+	return err
+}
+
+func (bot *Bot) downloadFile(fileID string) (io.ReadCloser, error) {
+	file, err := bot.api.GetFile(tgbotapi.FileConfig{FileID: fileID})
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf(bot.fileEndpoint, bot.token, file.FilePath)
+	return newLazyDownloader(url), nil
+}
+
 func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) error {
 	if c, ok := bot.commands[cmd]; ok {
 		_, err := c.Call(ctx, args)
 		return err
 	}
 	return &commander.UnknownCommandError{Cmd: cmd}
+}
+
+func (bot *Bot) startDialog(ctx *Context, name string) error {
+	h := bot.dialogs[name]
+	if h == nil {
+		return fmt.Errorf("unknown dialog: %s", name)
+	}
+	chat, err := bot.getChat(ctx.chatID)
+	if err != nil {
+		return err
+	}
+	username, _ := bot.getUsernameFromUserID(ctx.userID)
+	dlg := &Dialog{
+		userID: ctx.userID,
+		chatID: ctx.chatID,
+		data: dialogData{
+			Name:      name,
+			Username:  username,
+			IsPrivate: chat.IsPrivate(),
+		},
+		handler: h,
+	}
+	updates, isDone := dlg.runHandler(ctx)
+	for _, update := range updates {
+		bot.sendDialogMessage(dlg, update)
+	}
+	if !isDone {
+		bot.saveDialog(dlg)
+	}
+	return nil
 }
 
 func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
@@ -313,7 +279,7 @@ func (bot *Bot) deleteDialog(dlg *Dialog) {
 	}
 }
 
-func (bot *Bot) handleDialogInput(ctx context.Context, dlg *Dialog, kind dialogInputKind, data string) bool {
+func (bot *Bot) handleDialogInput(ctx *Context, dlg *Dialog, kind dialogInputKind, data string) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			bot.logger.Error("dialog panic", slog.String("name", dlg.data.Name), slog.Any("panic", r))
@@ -321,7 +287,7 @@ func (bot *Bot) handleDialogInput(ctx context.Context, dlg *Dialog, kind dialogI
 		}
 	}()
 
-	ctx = ctxWithDialog(ctx, dlg)
+	ctx.dlg = dlg
 	updates, isDone, err := dlg.handleInput(ctx, kind, data)
 	if err != nil {
 		if err == errInvalidDialogInput {
@@ -400,63 +366,4 @@ func (bot *Bot) handleFile(msg *tgbotapi.Message, fileID string) {
 		ctx := newContext(bot, msg)
 		bot.handleDialogInput(ctx, dlg, dialogInputFile, fileID)
 	}
-}
-
-func (bot *Bot) getReplyIDFromCtx(ctx context.Context) int {
-	if replyID, ok := CtxGetReplyID(ctx); ok {
-		return replyID
-	}
-	if dlg := ctxGetDialog(ctx); dlg != nil {
-		if q := dlg.getQueryData(dlg.data.LastQuery); q != nil {
-			if q.ReplyID != 0 {
-				return q.ReplyID
-			}
-			return q.Query.MessageID
-		}
-	}
-	return 0
-}
-
-func (bot *Bot) getChat(chatID int64) (tgbotapi.Chat, error) {
-	return bot.api.GetChat(tgbotapi.ChatInfoConfig{ChatConfig: tgbotapi.ChatConfig{ChatID: chatID}})
-}
-
-func (bot *Bot) getUsernameFromUserID(userID int64) (string, error) {
-	chat, err := bot.getChat(userID)
-	if err != nil {
-		return fmt.Sprintf("user:%d", userID), err
-	}
-	if len(chat.UserName) > 0 {
-		return chat.UserName, nil
-	} else if len(chat.FirstName) > 0 {
-		return chat.FirstName, nil
-	} else if len(chat.LastName) > 0 {
-		return chat.LastName, nil
-	}
-	return fmt.Sprintf("user:%d", userID), nil
-}
-
-func getFileIDsFromMessage(msg *tgbotapi.Message) (ids []string) {
-	if len(msg.Photo) > 0 {
-		ids = append(ids, msg.Photo[0].FileID)
-	}
-	if msg.Video != nil {
-		ids = append(ids, msg.Video.FileID)
-	}
-	if msg.VideoNote != nil {
-		ids = append(ids, msg.VideoNote.FileID)
-	}
-	if msg.Audio != nil {
-		ids = append(ids, msg.Audio.FileID)
-	}
-	if msg.Voice != nil {
-		ids = append(ids, msg.Voice.FileID)
-	}
-	if msg.Sticker != nil {
-		ids = append(ids, msg.Sticker.FileID)
-	}
-	if msg.Document != nil {
-		ids = append(ids, msg.Document.FileID)
-	}
-	return
 }

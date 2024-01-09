@@ -1,7 +1,6 @@
 package botkit
 
 import (
-	"context"
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -15,7 +14,7 @@ const (
 
 var errInvalidDialogInput = fmt.Errorf("invalid dialog input")
 
-type DialogHandler func(context.Context, *Dialog) *Query
+type DialogHandler func(*Context, *Dialog) *Query
 
 type Dialog struct {
 	userID  int64
@@ -44,10 +43,6 @@ type dialogInputKind int
 type dialogMessage interface {
 	toChattable(dlg *Dialog) tgbotapi.Chattable
 	setMessageID(int)
-}
-
-type wrapperDialogMessage struct {
-	c tgbotapi.Chattable
 }
 
 func (dlg *Dialog) Query(queryName string) *Query {
@@ -94,7 +89,7 @@ func (dlg *Dialog) LastUserChoices() ([]int, bool) {
 	return dlg.UserChoices(dlg.data.LastQuery)
 }
 
-func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data string) (updates []dialogMessage, isDone bool, err error) {
+func (dlg *Dialog) handleInput(ctx *Context, kind dialogInputKind, data string) (updates []dialogMessage, isDone bool, err error) {
 	last := dlg.getQueryData(dlg.data.LastQuery)
 	if last == nil {
 		return nil, true, fmt.Errorf("missing last query of dialog %q", dlg.data.Name)
@@ -130,14 +125,14 @@ func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data s
 			return nil, false, errInvalidDialogInput
 		}
 		last.UserResponse = data
-		last.ReplyID, _ = CtxGetReplyID(ctx)
+		last.ReplyID = ctx.replyID
 
 	case dialogInputFile:
 		if last.Query.Kind != FileInputQueryKind {
 			return nil, false, errInvalidDialogInput
 		}
 		last.UserResponse = data
-		last.ReplyID, _ = CtxGetReplyID(ctx)
+		last.ReplyID = ctx.replyID
 
 	default:
 		return nil, false, errInvalidDialogInput
@@ -148,7 +143,7 @@ func (dlg *Dialog) handleInput(ctx context.Context, kind dialogInputKind, data s
 	return updates, isDone, nil
 }
 
-func (dlg *Dialog) runHandler(ctx context.Context) (updates []dialogMessage, isDone bool) {
+func (dlg *Dialog) runHandler(ctx *Context) (updates []dialogMessage, isDone bool) {
 	if q := dlg.handler(ctx, dlg); q != nil {
 		if q.Kind == RetryQueryKind {
 			return updates, false
@@ -181,15 +176,4 @@ func (dlg *Dialog) setLastQuery(q *Query) {
 
 func (dlg *Dialog) isPrivate() bool {
 	return dlg.data.IsPrivate
-}
-
-func newMessageFromChattable(c tgbotapi.Chattable) dialogMessage {
-	return &wrapperDialogMessage{c: c}
-}
-
-func (m *wrapperDialogMessage) toChattable(*Dialog) tgbotapi.Chattable {
-	return m.c
-}
-
-func (*wrapperDialogMessage) setMessageID(int) {
 }

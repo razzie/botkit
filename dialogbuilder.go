@@ -1,7 +1,6 @@
 package botkit
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -19,7 +18,7 @@ type dialogStep struct {
 }
 
 type dialogStepHandler func(response any) error
-type dialogFinalizer func(ctx context.Context, responses []any)
+type dialogFinalizer func(ctx *Context, responses []any)
 
 func NewDialogBuilder() *DialogBuilder {
 	return new(DialogBuilder)
@@ -75,7 +74,7 @@ func (db *DialogBuilder) AddFileInputQuery(text string, validator func(io.Reader
 	return db
 }
 
-func (db *DialogBuilder) SetFinalizer(finalizer func(ctx context.Context, responses []any)) *DialogBuilder {
+func (db *DialogBuilder) SetFinalizer(finalizer func(ctx *Context, responses []any)) *DialogBuilder {
 	db.finalizer = finalizer
 	return db
 }
@@ -85,7 +84,7 @@ func (db *DialogBuilder) Build() DialogHandler {
 		return nil
 	}
 
-	return func(ctx context.Context, dlg *Dialog) *Query {
+	return func(ctx *Context, dlg *Dialog) *Query {
 		q := dlg.LastQuery()
 		if q == nil {
 			return db.steps[0].query
@@ -95,7 +94,7 @@ func (db *DialogBuilder) Build() DialogHandler {
 		resp := db.steps[id].getUserResponse(ctx, dlg)
 		handler := db.steps[id].handler
 		if err := handler(resp); err != nil {
-			SendReply(ctx, "%v", err)
+			ctx.SendReply("%v", err)
 			return RetryQuery
 		}
 
@@ -131,7 +130,7 @@ func (db *DialogBuilder) addStep(kind QueryKind, text string, handler dialogStep
 	return query
 }
 
-func (ds *dialogStep) getUserResponse(ctx context.Context, dlg *Dialog) any {
+func (ds *dialogStep) getUserResponse(ctx *Context, dlg *Dialog) any {
 	switch ds.query.Kind {
 	case TextInputQueryKind:
 		resp, _ := dlg.UserResponse(ds.query.Name)
@@ -144,7 +143,7 @@ func (ds *dialogStep) getUserResponse(ctx context.Context, dlg *Dialog) any {
 		return resp
 	case FileInputQueryKind:
 		resp, _ := dlg.UserResponse(ds.query.Name)
-		file, _ := CtxGetBot(ctx).DownloadFile(resp)
+		file, _ := ctx.DownloadFile(resp)
 		return file
 	default:
 		return nil

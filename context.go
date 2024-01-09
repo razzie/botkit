@@ -3,82 +3,90 @@ package botkit
 import (
 	"context"
 	"fmt"
+	"io"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/razzie/razcache"
 )
 
-type ctxKey string
-
-var (
-	ErrInvalidContext = fmt.Errorf("invalid context")
-
-	ctxBot         ctxKey = "ctxBot"
-	ctxUserID      ctxKey = "ctxUser"
-	ctxChatID      ctxKey = "ctxChat"
-	ctxReplyID     ctxKey = "ctxReplyID"
-	ctxDialog      ctxKey = "ctxDialog"
-	ctxTaggedUsers ctxKey = "ctxTaggedUsers"
-)
-
-func newContext(bot *Bot, msg *tgbotapi.Message) context.Context {
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, ctxBot, bot)
-	ctx = context.WithValue(ctx, ctxUserID, msg.From.ID)
-	ctx = context.WithValue(ctx, ctxChatID, msg.Chat.ID)
-	ctx = context.WithValue(ctx, ctxReplyID, msg.MessageID)
-	ctx = context.WithValue(ctx, ctxTaggedUsers, getTaggedUsers(msg))
-	return ctx
+type Context struct {
+	context.Context
+	bot         *Bot
+	userID      int64
+	chatID      int64
+	replyID     int
+	dlg         *Dialog
+	taggedUsers []int64
 }
 
-func CtxGetBot(ctx context.Context) *Bot {
-	if bot, ok := ctx.Value(ctxBot).(*Bot); ok {
-		return bot
+func resolveContext(ctx context.Context) (*Context, error) {
+	return ctx.(*Context), nil
+}
+
+func newContext(bot *Bot, msg *tgbotapi.Message) *Context {
+	return &Context{
+		bot:     bot,
+		userID:  msg.From.ID,
+		chatID:  msg.Chat.ID,
+		replyID: msg.MessageID,
 	}
-	return nil
 }
 
-func CtxGetChat(ctx context.Context) (int64, bool) {
-	chatID, ok := ctx.Value(ctxChatID).(int64)
-	return chatID, ok
+func (ctx *Context) SendMessage(format string, args ...any) error {
+	return ctx.bot.sendMessage(ctx.chatID, fmt.Sprintf(format, args...), 0)
 }
 
-func CtxGetUserAndChat(ctx context.Context) (int64, int64, bool) {
-	userID, ok1 := ctx.Value(ctxUserID).(int64)
-	chatID, ok2 := ctx.Value(ctxChatID).(int64)
-	return userID, chatID, ok1 && ok2
+func (ctx *Context) SendReply(format string, args ...any) error {
+	return ctx.bot.sendMessage(ctx.chatID, fmt.Sprintf(format, args...), ctx.replyID)
 }
 
-func CtxGetReplyID(ctx context.Context) (int, bool) {
-	replyID, ok := ctx.Value(ctxReplyID).(int)
-	return replyID, ok
+func (ctx *Context) SendMedia(media ...Media) error {
+	return ctx.bot.sendMedia(ctx.chatID, 0, media...)
 }
 
-func CtxGetTaggedUsers(ctx context.Context) ([]int64, bool) {
-	users, ok := ctx.Value(ctxTaggedUsers).([]int64)
-	return users, ok
+func (ctx *Context) ReplyMedia(media ...Media) error {
+	return ctx.bot.sendMedia(ctx.chatID, ctx.replyID, media...)
 }
 
-func CtxGetTaggedUserCount(ctx context.Context) (int, bool) {
-	users, ok := ctx.Value(ctxTaggedUsers).([]int64)
-	return len(users), ok
+func (ctx *Context) SendSticker(stickerSet string, num int) error {
+	return ctx.bot.sendSticker(ctx.chatID, stickerSet, num, 0)
 }
 
-func ctxGetDialog(ctx context.Context) *Dialog {
-	if dlg, ok := ctx.Value(ctxDialog).(*Dialog); ok {
-		return dlg
+func (ctx *Context) ReplySticker(stickerSet string, num int) error {
+	return ctx.bot.sendSticker(ctx.chatID, stickerSet, num, ctx.replyID)
+}
+
+func (ctx *Context) StartDialog(name string) error {
+	return ctx.bot.startDialog(ctx, name)
+}
+
+func (ctx *Context) GetChatCache() (razcache.Cache, error) {
+	return ctx.bot.getChatCache(ctx.chatID)
+}
+
+func (ctx *Context) GetUserCache() (razcache.Cache, error) {
+	return ctx.bot.getUserCache(ctx.chatID, ctx.chatID)
+}
+
+func (ctx *Context) GetTaggedUserCache(num int) (razcache.Cache, error) {
+	if num < 0 || num >= len(ctx.taggedUsers) {
+		return nil, fmt.Errorf("num %d out of range (%d tagged users)", num, len(ctx.taggedUsers))
 	}
-	return nil
+	return ctx.bot.getUserCache(ctx.taggedUsers[num], ctx.chatID)
 }
 
-func ctxWithDialog(ctx context.Context, dlg *Dialog) context.Context {
-	return context.WithValue(ctx, ctxDialog, dlg)
+func (ctx *Context) GetTaggedUserCount() int {
+	return len(ctx.taggedUsers)
 }
 
-func getTaggedUsers(msg *tgbotapi.Message) (users []int64) {
-	for _, entity := range msg.Entities {
-		if entity.User != nil {
-			users = append(users, entity.User.ID)
-		}
-	}
-	return
+func (ctx *Context) UploadFile(name string, r io.Reader) error {
+	return ctx.bot.uploadFile(ctx.chatID, name, r)
+}
+
+func (ctx *Context) UploadFileFromURL(url string) error {
+	return ctx.bot.uploadFileFromURL(ctx.chatID, url)
+}
+
+func (ctx *Context) DownloadFile(fileID string) (io.ReadCloser, error) {
+	return ctx.bot.downloadFile(fileID)
 }

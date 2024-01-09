@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -37,19 +36,19 @@ func main() {
 			}
 			return nil
 		}).
-		SetFinalizer(func(ctx context.Context, responses []any) {
-			botkit.SendMessage(ctx, "responses: %v", responses)
+		SetFinalizer(func(ctx *botkit.Context, responses []any) {
+			ctx.SendMessage("responses: %v", responses)
 		}).
 		Build()
 
 	filedlg := botkit.NewDialogBuilder().
 		AddFileInputQuery("Upload a file", nil).
-		SetFinalizer(func(ctx context.Context, responses []any) {
+		SetFinalizer(func(ctx *botkit.Context, responses []any) {
 			file := responses[0].(io.Reader)
 			p := make([]byte, 4)
 			n, _ := file.Read(p)
 			p = p[:n]
-			botkit.SendReply(ctx, "First %d bytes in hex: %x", n, p)
+			ctx.SendReply("First %d bytes in hex: %x", n, p)
 		}).
 		Build()
 
@@ -79,36 +78,36 @@ func main() {
 	bot.Run()
 }
 
-func cmdHelloWorld(ctx context.Context) {
-	botkit.SendMessage(ctx, "Hello World!")
+func cmdHelloWorld(ctx *botkit.Context) {
+	ctx.SendMessage("Hello World!")
 }
 
-func cmdAlbum(ctx context.Context) {
-	botkit.SendMedia(ctx,
+func cmdAlbum(ctx *botkit.Context) {
+	ctx.SendMedia(
 		botkit.NewPhoto(botkit.URLSource("https://gorzsony.com/img/razchess.png")),
 		botkit.NewPhoto(botkit.URLSource("https://gorzsony.com/img/razbox.png")))
 }
 
-func cmdStartDialog(ctx context.Context) {
-	botkit.StartDialog(ctx, "dlg")
+func cmdStartDialog(ctx *botkit.Context) {
+	ctx.StartDialog("dlg")
 }
 
-func cmdFileDialog(ctx context.Context) {
-	botkit.StartDialog(ctx, "filedlg")
+func cmdFileDialog(ctx *botkit.Context) {
+	ctx.StartDialog("filedlg")
 }
 
-func cmdSticker(ctx context.Context) {
-	botkit.SendSticker(ctx, "pizzabot", -1)
+func cmdSticker(ctx *botkit.Context) {
+	ctx.SendSticker("pizzabot", -1)
 }
 
-func cmdSum(ctx context.Context, a, b int) {
-	botkit.SendReply(ctx, "%d", a+b)
+func cmdSum(ctx *botkit.Context, a, b int) {
+	ctx.SendReply("%d", a+b)
 }
 
-func cmdSumMany(ctx context.Context, numbers ...int) {
+func cmdSumMany(ctx *botkit.Context, numbers ...int) {
 	sum := 0
 	for _, n := range numbers {
 		sum += n
 	}
-	botkit.SendReply(ctx, "%d", sum)
+	ctx.SendReply("%d", sum)
 }

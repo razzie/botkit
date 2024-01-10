@@ -14,8 +14,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/puzpuzpuz/xsync/v3 v3.0.2 h1:3yESHrRFYr6xzkz61LLkvNiPFXxJEAABanTQpKbAaew=
 github.com/puzpuzpuz/xsync/v3 v3.0.2/go.mod h1:VjzYrABPabuM4KyBh1Ftq6u8nhwY5tBPKP9jpmh0nnA=
-github.com/razzie/commander v0.0.0-20240109214720-41add1e35011 h1:nfhsGURudgnG48X6TkjiITeETGNkj8isMMiPCTZNeZ4=
-github.com/razzie/commander v0.0.0-20240109214720-41add1e35011/go.mod h1:5aNFJRaEwWen5why/jVyp4gJC/o/LKS9jcAQFekgVrU=
+github.com/razzie/commander v0.0.0-20240109233356-3adbc12981fc h1:U+O4EgUoh/90RXLELAM7en2g3l1ACsl3rbJe8OaMZJY=
+github.com/razzie/commander v0.0.0-20240109233356-3adbc12981fc/go.mod h1:5aNFJRaEwWen5why/jVyp4gJC/o/LKS9jcAQFekgVrU=
 github.com/razzie/razcache v0.0.0-20240102195705-1942b46103c3 h1:r9n3Epu9lDcZB6T5cqZ/W0etAB6n+AZdeFdripjML/0=
 github.com/razzie/razcache v0.0.0-20240102195705-1942b46103c3/go.mod h1:efrqz/q6DebaS90mU+kbddmok4omCWnPoQV9/VrgouQ=
 github.com/redis/go-redis/v9 v9.3.1 h1:KqdY8U+3X6z+iACvumCNxnoluToB+9Me+TvyFa21Mds=

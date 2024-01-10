@@ -105,6 +105,7 @@ func (db *DialogBuilder) Build() DialogHandler {
 				for i := range resps {
 					resps[i] = db.steps[i].getUserResponse(ctx, dlg)
 				}
+				defer closeReaders(resps)
 				db.finalizer(ctx, resps)
 			}
 			return nil
@@ -164,4 +165,12 @@ func getDialogStepIDFromQueryName(queryName string) (int, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func closeReaders(resps []any) {
+	for _, resp := range resps {
+		if r, ok := resp.(io.ReadCloser); ok {
+			r.Close()
+		}
+	}
 }

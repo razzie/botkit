@@ -25,10 +25,11 @@ func resolveContext(ctx context.Context) (*Context, error) {
 
 func newContext(bot *Bot, msg *tgbotapi.Message) *Context {
 	return &Context{
-		bot:     bot,
-		userID:  msg.From.ID,
-		chatID:  msg.Chat.ID,
-		replyID: msg.MessageID,
+		bot:         bot,
+		userID:      msg.From.ID,
+		chatID:      msg.Chat.ID,
+		replyID:     msg.MessageID,
+		taggedUsers: getTaggedUsers(msg),
 	}
 }
 

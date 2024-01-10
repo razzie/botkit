@@ -9,21 +9,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-/*func getReplyIDFromCtx(ctx context.Context) int {
-	if replyID, ok := CtxGetReplyID(ctx); ok {
-		return replyID
-	}
-	if dlg := ctxGetDialog(ctx); dlg != nil {
-		if q := dlg.getQueryData(dlg.data.LastQuery); q != nil {
-			if q.ReplyID != 0 {
-				return q.ReplyID
-			}
-			return q.Query.MessageID
-		}
-	}
-	return 0
-}*/
-
 type lazyDownloader struct {
 	reader io.ReadCloser
 	init   func() (io.ReadCloser, error)

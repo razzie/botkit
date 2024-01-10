@@ -78,8 +78,8 @@ func main() {
 	bot.Run()
 }
 
-func cmdHelloWorld(ctx *botkit.Context) {
-	ctx.SendMessage("Hello World!")
+func cmdHelloWorld() botkit.CommandResponse {
+	return botkit.SendMessage("Hello World!")
 }
 
 func cmdAlbum(ctx *botkit.Context) {

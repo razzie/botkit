@@ -17,10 +17,7 @@ type Context struct {
 	replyID     int
 	dlg         *Dialog
 	taggedUsers []int64
-}
-
-func resolveContext(ctx context.Context) (*Context, error) {
-	return ctx.(*Context), nil
+	isPrivate   bool
 }
 
 func newContext(bot *Bot, msg *tgbotapi.Message) *Context {
@@ -30,7 +27,12 @@ func newContext(bot *Bot, msg *tgbotapi.Message) *Context {
 		chatID:      msg.Chat.ID,
 		replyID:     msg.MessageID,
 		taggedUsers: getTaggedUsers(msg),
+		isPrivate:   msg.Chat.IsPrivate(),
 	}
+}
+
+func (ctx *Context) StartDialog(name string) error {
+	return ctx.bot.startDialog(ctx, name)
 }
 
 func (ctx *Context) SendMessage(format string, args ...any) error {
@@ -57,8 +59,16 @@ func (ctx *Context) ReplySticker(stickerSet string, num int) error {
 	return ctx.bot.sendSticker(ctx.chatID, stickerSet, num, ctx.replyID)
 }
 
-func (ctx *Context) StartDialog(name string) error {
-	return ctx.bot.startDialog(ctx, name)
+func (ctx *Context) UploadFile(name string, r io.Reader) error {
+	return ctx.bot.uploadFile(ctx.chatID, name, r)
+}
+
+func (ctx *Context) UploadFileFromURL(url string) error {
+	return ctx.bot.uploadFileFromURL(ctx.chatID, url)
+}
+
+func (ctx *Context) DownloadFile(fileID string) (io.ReadCloser, error) {
+	return ctx.bot.downloadFile(fileID)
 }
 
 func (ctx *Context) GetChatCache() (razcache.Cache, error) {
@@ -78,16 +88,4 @@ func (ctx *Context) GetTaggedUserCache(num int) (razcache.Cache, error) {
 
 func (ctx *Context) GetTaggedUserCount() int {
 	return len(ctx.taggedUsers)
-}
-
-func (ctx *Context) UploadFile(name string, r io.Reader) error {
-	return ctx.bot.uploadFile(ctx.chatID, name, r)
-}
-
-func (ctx *Context) UploadFileFromURL(url string) error {
-	return ctx.bot.uploadFileFromURL(ctx.chatID, url)
-}
-
-func (ctx *Context) DownloadFile(fileID string) (io.ReadCloser, error) {
-	return ctx.bot.downloadFile(fileID)
 }

@@ -1,7 +1,6 @@
 package botkit
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -201,14 +200,6 @@ func (bot *Bot) downloadFile(fileID string) (io.ReadCloser, error) {
 	return newLazyDownloader(url), nil
 }
 
-func (bot *Bot) callCommand(cmd string, ctx context.Context, args []string) error {
-	if c, ok := bot.commands[cmd]; ok {
-		_, err := c.Call(ctx, args)
-		return err
-	}
-	return &commander.UnknownCommandError{Cmd: cmd}
-}
-
 func (bot *Bot) startDialog(ctx *Context, name string) error {
 	h := bot.dialogs[name]
 	if h == nil {
@@ -309,6 +300,15 @@ func (bot *Bot) handleDialogInput(ctx *Context, dlg *Dialog, kind dialogInputKin
 		bot.saveDialog(dlg)
 	}
 	return true
+}
+
+func (bot *Bot) callCommand(cmd string, ctx *Context, args []string) error {
+	if c, ok := bot.commands[cmd]; ok {
+		resps, err := c.Call(ctx, args)
+		handleCommandResponses(ctx, resps)
+		return err
+	}
+	return &commander.UnknownCommandError{Cmd: cmd}
 }
 
 func (bot *Bot) handleCommand(msg *tgbotapi.Message) {

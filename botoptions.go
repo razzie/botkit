@@ -75,7 +75,7 @@ func WithCommand(cmd string, callback any) BotOption {
 		if bo.commands == nil {
 			bo.commands = make(map[string]*commander.Command)
 		}
-		if c, err := commander.NewCommand(callback, commander.ContextResolverFunc(resolveContext)); err != nil {
+		if c, err := commander.NewCommand(callback, cmdContextResolver); err != nil {
 			bo.logger.Error("failed to create command %s: %v", cmd, err)
 		} else {
 			bo.commands[cmd] = c

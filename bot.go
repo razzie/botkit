@@ -173,6 +173,11 @@ func (bot *Bot) sendSticker(chatID int64, stickerSet string, num int, replyID in
 }
 
 func (bot *Bot) uploadFile(chatID int64, name string, r io.Reader) error {
+	if rc, ok := r.(io.ReadCloser); ok {
+		// tgbotapi might or might not close the reader, so let's do it only here
+		r = &wrappedReader{Reader: r}
+		defer rc.Close()
+	}
 	doc := tgbotapi.NewDocument(chatID, tgbotapi.FileReader{
 		Name:   name,
 		Reader: r,

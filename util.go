@@ -96,3 +96,7 @@ func (m *wrapperDialogMessage) toChattable(*Dialog) tgbotapi.Chattable {
 
 func (*wrapperDialogMessage) setMessageID(int) {
 }
+
+type wrappedReader struct {
+	io.Reader
+}

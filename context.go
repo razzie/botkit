@@ -68,7 +68,7 @@ func (ctx *Context) UploadFileFromURL(url string) error {
 }
 
 func (ctx *Context) DownloadFile(fileID string) (io.ReadCloser, error) {
-	return ctx.bot.downloadFile(fileID)
+	return ctx.bot.DownloadFile(fileID)
 }
 
 func (ctx *Context) GetChatCache() (razcache.Cache, error) {
@@ -88,4 +88,12 @@ func (ctx *Context) GetTaggedUserCache(num int) (razcache.Cache, error) {
 
 func (ctx *Context) GetTaggedUserCount() int {
 	return len(ctx.taggedUsers)
+}
+
+func (ctx *Context) GetChat() Chat {
+	return newChat(ctx.bot, ctx.chatID)
+}
+
+func (ctx *Context) GetChatID() int64 {
+	return ctx.chatID
 }

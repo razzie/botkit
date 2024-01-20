@@ -77,6 +77,10 @@ func (bot *Bot) Close() error {
 	return nil
 }
 
+func (bot *Bot) GetChat(chatID int64) Chat {
+	return newChat(bot, chatID)
+}
+
 func (bot *Bot) getChatCache(chatID int64) (razcache.Cache, error) {
 	return bot.cache.SubCache(fmt.Sprintf("chatdata:%d:", chatID)), nil
 }
@@ -85,12 +89,12 @@ func (bot *Bot) getUserCache(userID, chatID int64) (razcache.Cache, error) {
 	return bot.cache.SubCache(fmt.Sprintf("userdata:%d:%d:", userID, chatID)), nil
 }
 
-func (bot *Bot) getChat(chatID int64) (tgbotapi.Chat, error) {
+func (bot *Bot) getChatData(chatID int64) (tgbotapi.Chat, error) {
 	return bot.api.GetChat(tgbotapi.ChatInfoConfig{ChatConfig: tgbotapi.ChatConfig{ChatID: chatID}})
 }
 
 func (bot *Bot) getUsernameFromUserID(userID int64) (string, error) {
-	chat, err := bot.getChat(userID)
+	chat, err := bot.getChatData(userID)
 	if err != nil {
 		return fmt.Sprintf("user:%d", userID), err
 	}
@@ -191,7 +195,7 @@ func (bot *Bot) uploadFileFromURL(chatID int64, url string) error {
 	return err
 }
 
-func (bot *Bot) downloadFile(fileID string) (io.ReadCloser, error) {
+func (bot *Bot) DownloadFile(fileID string) (io.ReadCloser, error) {
 	file, err := bot.api.GetFile(tgbotapi.FileConfig{FileID: fileID})
 	if err != nil {
 		return nil, err
@@ -205,7 +209,7 @@ func (bot *Bot) startDialog(ctx *Context, name string) error {
 	if h == nil {
 		return fmt.Errorf("unknown dialog: %s", name)
 	}
-	chat, err := bot.getChat(ctx.chatID)
+	chat, err := bot.getChatData(ctx.chatID)
 	if err != nil {
 		return err
 	}

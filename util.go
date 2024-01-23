@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -99,4 +100,32 @@ func (*wrapperDialogMessage) setMessageID(int) {
 
 type wrappedReader struct {
 	io.Reader
+}
+
+func slogMessage(msg *tgbotapi.Message) slog.Attr {
+	return slog.Group("message",
+		slog.Int("messageID", msg.MessageID),
+		slog.Int64("chatID", msg.Chat.ID),
+		slog.Int64("userID", msg.From.ID),
+		slog.String("text", msg.Text))
+}
+
+func slogCallbackQuery(q *tgbotapi.CallbackQuery) slog.Attr {
+	return slog.Group("callback_query",
+		slog.String("ID", q.ID),
+		slog.String("data", q.Data))
+}
+
+func slogContext(ctx *Context) slog.Attr {
+	return slog.Group("ctx",
+		slog.Int64("userID", ctx.userID),
+		slog.Int64("chatID", ctx.chatID),
+		slog.Int("replyID", ctx.replyID))
+}
+
+func slogDialog(dlg *Dialog) slog.Attr {
+	return slog.Group("dlg",
+		slog.String("name", dlg.data.Name),
+		slog.Int64("userID", dlg.userID),
+		slog.Int64("chatID", dlg.chatID))
 }

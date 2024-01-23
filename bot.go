@@ -237,10 +237,12 @@ func (bot *Bot) startDialog(ctx *Context, name string) error {
 func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
 	dataJson, err := bot.cache.Get(fmt.Sprintf("dialog:%d:%d", userID, chatID))
 	if err != nil {
-		bot.logger.Debug("dialog not found",
-			slog.Any("userID", userID),
-			slog.Any("chatID", chatID),
-			slog.Any("err", err))
+		if err != razcache.ErrNotFound {
+			bot.logger.Error("dialog not found",
+				slog.Any("userID", userID),
+				slog.Any("chatID", chatID),
+				slog.Any("err", err))
+		}
 		return nil
 	}
 	dlg := &Dialog{
@@ -249,11 +251,11 @@ func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
 	}
 	err = json.Unmarshal([]byte(dataJson), &dlg.data)
 	if err != nil {
-		bot.logger.Error("failed to unmarshal dialog", slog.Any("err", err))
+		bot.logger.Error("failed to unmarshal dialog", slogDialog(dlg), slog.Any("err", err))
 		return nil
 	}
 	if dlg.handler = bot.dialogs[dlg.data.Name]; dlg.handler == nil {
-		bot.logger.Error("missing handler for dialog", slog.Any("dlg", dlg.data.Name))
+		bot.logger.Error("missing handler for dialog", slogDialog(dlg))
 		return nil
 	}
 	return dlg
@@ -262,12 +264,12 @@ func (bot *Bot) getDialog(userID, chatID int64) *Dialog {
 func (bot *Bot) saveDialog(dlg *Dialog) {
 	dataJson, err := json.Marshal(dlg.data)
 	if err != nil {
-		bot.logger.Error("failed to marshal dialog", slog.Any("err", err))
+		bot.logger.Error("failed to marshal dialog", slogDialog(dlg), slog.Any("err", err))
 		return
 	}
 	err = bot.cache.Set(fmt.Sprintf("dialog:%d:%d", dlg.userID, dlg.chatID), string(dataJson), bot.dialogTTL)
 	if err != nil {
-		bot.logger.Error("failed to save dialog", slog.Any("err", err))
+		bot.logger.Error("failed to save dialog", slogDialog(dlg), slog.Any("err", err))
 		return
 	}
 }
@@ -275,14 +277,14 @@ func (bot *Bot) saveDialog(dlg *Dialog) {
 func (bot *Bot) deleteDialog(dlg *Dialog) {
 	err := bot.cache.Del(fmt.Sprintf("dialog:%d:%d", dlg.userID, dlg.chatID))
 	if err != nil {
-		bot.logger.Error("failed to delete dialog", slog.Any("err", err))
+		bot.logger.Error("failed to delete dialog", slogDialog(dlg), slog.Any("err", err))
 	}
 }
 
 func (bot *Bot) handleDialogInput(ctx *Context, dlg *Dialog, kind dialogInputKind, data string) bool {
 	defer func() {
 		if r := recover(); r != nil {
-			bot.logger.Error("dialog panic", slog.String("name", dlg.data.Name), slog.Any("panic", r))
+			bot.logger.Error("dialog panic", slogContext(ctx), slogDialog(dlg), slog.Any("panic", r))
 			bot.deleteDialog(dlg)
 		}
 	}()
@@ -293,7 +295,7 @@ func (bot *Bot) handleDialogInput(ctx *Context, dlg *Dialog, kind dialogInputKin
 		if err == errInvalidDialogInput {
 			return false
 		}
-		bot.logger.Error("dialog error", slog.String("dlg", dlg.data.Name), slog.Any("err", err))
+		bot.logger.Error("dialog error", slogDialog(dlg), slog.Any("err", err))
 	}
 	for _, update := range updates {
 		bot.sendDialogMessage(dlg, update)
@@ -346,7 +348,7 @@ fallback:
 		ctx := newContext(bot, msg)
 		err := bot.defaultMsgHandler(ctx, msg.Text)
 		if err != nil {
-			bot.logger.Error("default message handler error", slog.Any("err", err))
+			bot.logger.Error("default message handler error", slogMessage(msg), slog.Any("err", err))
 		}
 	}
 }
@@ -360,7 +362,7 @@ func (bot *Bot) handleCallback(q *tgbotapi.CallbackQuery) {
 		}
 	}
 	if _, err := bot.api.Request(callback); err != nil {
-		bot.logger.Error("callback returned error", slog.String("data", q.Data), slog.Any("err", err))
+		bot.logger.Error("callback returned error", slogCallbackQuery(q), slog.Any("err", err))
 	}
 }
 
